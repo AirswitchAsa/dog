@@ -5,10 +5,11 @@ import pytest
 from dog_core import DogDocument, PrimitiveType, generate_index
 
 
-def make_doc(name: str, ptype: PrimitiveType) -> DogDocument:
+def make_doc(name: str, ptype: PrimitiveType, base_path: Path | None = None) -> DogDocument:
     """Helper to create test documents."""
+    file_path = Path(f"/test/{name.lower()}.dog.md") if base_path is None else base_path / f"{name.lower()}.dog.md"
     return DogDocument(
-        file_path=Path(f"/test/{name.lower()}.dog.md"),
+        file_path=file_path,
         primitive_type=ptype,
         name=name,
         sections=[],
@@ -46,50 +47,50 @@ class TestGenerateIndex:
     @pytest.mark.asyncio
     async def test_index_lists_actors(self, tmp_path: Path) -> None:
         docs = [
-            make_doc("User", PrimitiveType.ACTOR),
-            make_doc("Admin", PrimitiveType.ACTOR),
+            make_doc("User", PrimitiveType.ACTOR, tmp_path),
+            make_doc("Admin", PrimitiveType.ACTOR, tmp_path),
         ]
         output_path = tmp_path / "index.dog.md"
 
         content = await generate_index(docs, "Test", output_path)
 
         assert "## Actors" in content
-        assert "- Admin" in content
-        assert "- User" in content
+        assert "[Admin]" in content
+        assert "[User]" in content
 
     @pytest.mark.asyncio
     async def test_index_lists_behaviors(self, tmp_path: Path) -> None:
         docs = [
-            make_doc("Login", PrimitiveType.BEHAVIOR),
-            make_doc("Logout", PrimitiveType.BEHAVIOR),
+            make_doc("Login", PrimitiveType.BEHAVIOR, tmp_path),
+            make_doc("Logout", PrimitiveType.BEHAVIOR, tmp_path),
         ]
         output_path = tmp_path / "index.dog.md"
 
         content = await generate_index(docs, "Test", output_path)
 
         assert "## Behaviors" in content
-        assert "- Login" in content
-        assert "- Logout" in content
+        assert "[Login]" in content
+        assert "[Logout]" in content
 
     @pytest.mark.asyncio
     async def test_index_lists_components(self, tmp_path: Path) -> None:
-        docs = [make_doc("AuthService", PrimitiveType.COMPONENT)]
+        docs = [make_doc("AuthService", PrimitiveType.COMPONENT, tmp_path)]
         output_path = tmp_path / "index.dog.md"
 
         content = await generate_index(docs, "Test", output_path)
 
         assert "## Components" in content
-        assert "- AuthService" in content
+        assert "[AuthService]" in content
 
     @pytest.mark.asyncio
     async def test_index_lists_data(self, tmp_path: Path) -> None:
-        docs = [make_doc("Credentials", PrimitiveType.DATA)]
+        docs = [make_doc("Credentials", PrimitiveType.DATA, tmp_path)]
         output_path = tmp_path / "index.dog.md"
 
         content = await generate_index(docs, "Test", output_path)
 
         assert "## Data" in content
-        assert "- Credentials" in content
+        assert "[Credentials]" in content
 
     @pytest.mark.asyncio
     async def test_index_excludes_existing_projects(self, tmp_path: Path) -> None:
@@ -107,18 +108,18 @@ class TestGenerateIndex:
     @pytest.mark.asyncio
     async def test_index_sorts_names(self, tmp_path: Path) -> None:
         docs = [
-            make_doc("Zeta", PrimitiveType.ACTOR),
-            make_doc("Alpha", PrimitiveType.ACTOR),
-            make_doc("Beta", PrimitiveType.ACTOR),
+            make_doc("Zeta", PrimitiveType.ACTOR, tmp_path),
+            make_doc("Alpha", PrimitiveType.ACTOR, tmp_path),
+            make_doc("Beta", PrimitiveType.ACTOR, tmp_path),
         ]
         output_path = tmp_path / "index.dog.md"
 
         content = await generate_index(docs, "Test", output_path)
 
         # Alpha should appear before Beta, Beta before Zeta
-        alpha_pos = content.index("- Alpha")
-        beta_pos = content.index("- Beta")
-        zeta_pos = content.index("- Zeta")
+        alpha_pos = content.index("[Alpha]")
+        beta_pos = content.index("[Beta]")
+        zeta_pos = content.index("[Zeta]")
 
         assert alpha_pos < beta_pos < zeta_pos
 
@@ -129,3 +130,27 @@ class TestGenerateIndex:
 
         assert "# Project: EmptyProject" in content
         assert "## Description" in content
+
+    @pytest.mark.asyncio
+    async def test_index_includes_relative_links(self, tmp_path: Path) -> None:
+        docs = [
+            make_doc("User", PrimitiveType.ACTOR, tmp_path),
+            make_doc("Login", PrimitiveType.BEHAVIOR, tmp_path),
+        ]
+        output_path = tmp_path / "index.dog.md"
+
+        content = await generate_index(docs, "Test", output_path)
+
+        assert "- [User](user.dog.md)" in content
+        assert "- [Login](login.dog.md)" in content
+
+    @pytest.mark.asyncio
+    async def test_index_handles_nested_paths(self, tmp_path: Path) -> None:
+        nested_dir = tmp_path / "actors"
+        nested_dir.mkdir()
+        docs = [make_doc("User", PrimitiveType.ACTOR, nested_dir)]
+        output_path = tmp_path / "index.dog.md"
+
+        content = await generate_index(docs, "Test", output_path)
+
+        assert "- [User](actors/user.dog.md)" in content

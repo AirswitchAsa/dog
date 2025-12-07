@@ -123,6 +123,6 @@ class TestIndexCommand:
 
         content = (tmp_dog_dir / "index.dog.md").read_text()
         assert "## Actors" in content
-        assert "- User" in content
+        assert "[User](user.dog.md)" in content
         assert "## Behaviors" in content
-        assert "- Login" in content
+        assert "[Login](login.dog.md)" in content

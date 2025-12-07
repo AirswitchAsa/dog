@@ -6,27 +6,27 @@ Project index for DOG CLI.
 
 ## Actors
 
-- User
+- [User](user.dog.md)
 
 ## Behaviors
 
-- Format
-- Generate Index
-- Lint
+- [Format](format.dog.md)
+- [Generate Index](generate-index.dog.md)
+- [Lint](lint.dog.md)
 
 ## Components
 
-- CLI
-- Formatter
-- Indexer
-- Linter
-- Parser
+- [CLI](cli.dog.md)
+- [Formatter](formatter.dog.md)
+- [Indexer](indexer.dog.md)
+- [Linter](linter.dog.md)
+- [Parser](parser.dog.md)
 
 ## Data
 
-- DogDocument
-- LintIssue
-- LintResult
+- [DogDocument](dog-document.dog.md)
+- [LintIssue](lint-issue.dog.md)
+- [LintResult](lint-result.dog.md)
 
 ## Notes
 
