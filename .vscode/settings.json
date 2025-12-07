@@ -1,0 +1,31 @@
+{
+  "workbench.colorTheme": "Default Light Modern",
+
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.suggestSmartCommit": false,
+
+  "terminal.integrated.defaultProfile.osx": "zsh",
+
+  "editor.minimap.enabled": false,
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "editor.formatOnType": false,
+  "editor.formatOnPaste": false,
+  "editor.rulers": [120],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.ruff": "explicit"
+  },
+
+  "[python]": {
+    "editor.tabSize": 4,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  },
+  "python.languageServer": "None",
+  "notebook.lineNumbers": "on",
+  "notebook.formatOnSave.enabled": true,
+  "ruff.enable": true,
+  "cursorpyright.analysis.diagnosticMode": "workspace",
+  "cursorpyright.analysis.typeCheckingMode": "basic"
+}

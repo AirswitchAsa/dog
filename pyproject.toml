@@ -1,0 +1,31 @@
+[project]
+name = "dog"
+authors = [{ name = "Qian Zhang", email = "contact@qzsh.email" }]
+version = "0.1.1"
+
+requires-python = ">=3.13, <3.14"
+dependencies = ["marko>=2.2.1", "pydantic>=2.12", "typer>=0.20.0"]
+
+[project.scripts]
+dog = "dog_cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dog_cli", "src/dog_core"]
+
+[dependency-groups]
+dev = [
+  "pre-commit>=4.0",
+  "ruff>=0.14",
+  "pyinstrument>=5.1",
+  "pyright>=1.1.407",
+  "pytest>=8.0",
+  "pytest-asyncio>=1.0",
+  "polyfactory>=2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true

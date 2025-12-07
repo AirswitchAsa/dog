@@ -1,0 +1,32 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: Ruff Format
+        entry: uv run ruff format --check
+        language: system
+        files: .py$
+
+      - id: ruff-lint
+        name: Ruff Lint
+        entry: uv run ruff check
+        language: system
+        files: .py$
+
+      - id: uv-lock-check
+        name: UV lockfile is up to date
+        entry: uv lock --check
+        language: system
+        files: .toml$|uv.lock
+        verbose: true
+        pass_filenames: false

@@ -1,0 +1,7 @@
+.DS_Store
+.env.local
+__pycache__
+.pytest_cache
+.cache
+.ruff_cache
+.uv-cache

@@ -1,0 +1,54 @@
+line-length = 120
+
+[lint.pydocstyle]
+convention = "google"
+
+[format]
+docstring-code-format = true
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
+
+[lint.isort]
+lines-after-imports = 2
+known-first-party = ["dog_cli", "dog_core"]
+section-order = [
+  "future",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "local-folder",
+]
+
+[lint]
+# see https://docs.astral.sh/ruff/rules/
+select = [
+  # Pyflakes
+  "F",
+  # pep8-naming
+  "N",
+  # pycodestyle
+  "E",
+  # pycodestyle warnings
+  "W",
+  # complexity
+  "C901",
+  # pyupgrade
+  "UP",
+  # flake8-bugbear
+  "B",
+  # flake8-simplify
+  "SIM",
+  # flake8-annotations
+  "ANN",
+  # flake8-async
+  "ASYNC",
+  # flake8-comprehensions
+  "C4",
+  # pytest style
+  "PT",
+  # isort
+  "I",
+]
+ignore = []
