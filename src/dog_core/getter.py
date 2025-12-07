@@ -37,7 +37,6 @@ class GetResult(BaseModel):
             "file": self.file_path,
             "sections": self.sections,
             "references": [r.to_dict() for r in self.references],
-            "content": self.raw_content,
         }
 
     def to_text(self) -> str:

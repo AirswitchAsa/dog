@@ -2,7 +2,7 @@
 
 ## Description
 
-The command-line interface component built with Typer. Provides the `dog` command with subcommands for `!Lint`, `!Format`, `!Generate Index`, `!Search`, `!Get`, and `!List` operations. Handles argument parsing, user feedback, and exit codes.
+The command-line interface component built with Typer. Provides the `dog` command with subcommands for `!Lint`, `!Format`, `!Generate Index`, `!Search`, `!Get`, `!List`, `!Patch`, and `!Serve` operations. Handles argument parsing, user feedback, and exit codes.
 
 ## State
 
@@ -18,9 +18,12 @@ The command-line interface component built with Typer. Provides the `dog` comman
 - search_command
 - get_command
 - list_command
+- patch_command
+- serve_command
 
 ## Notes
 
 - Uses Typer for argument parsing and help generation
 - Async operations run via asyncio.run()
-- Search, get, and list commands support JSON output for programmatic use
+- Search, get, list commands support JSON output for programmatic use
+- Type filtering uses sigil prefixes: @ (Actor), ! (Behavior), # (Component), & (Data)

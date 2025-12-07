@@ -18,14 +18,15 @@ Matching strategies:
 
 ## Outcome
 
-- Top-k documents returned sorted by score
+- Top-k documents returned sorted by relevance
+- Sorting: exact matches first, then by name distance, then by score
 - Each result includes name, type, file path, score, and snippet
-- Optional type filtering
+- Type filtering via sigil prefix
 - Supports text or JSON output formats
 
 ## Notes
 
-- Use `--type` to filter by primitive type
+- Use sigil prefix to filter by type: @ (Actor), ! (Behavior), # (Component), & (Data)
 - Use `--limit` to set k (default: 10)
 - Use `--output json` for programmatic consumption
 - Powered by RapidFuzz fuzzy string matching

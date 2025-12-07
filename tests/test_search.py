@@ -146,19 +146,48 @@ class TestSearchDocuments:
 
     @pytest.mark.asyncio
     async def test_low_relevance_query(self, parsed_docs: list) -> None:
-        # With top-k, we always get results sorted by score
+        # With top-k, we always get results sorted by name distance then score
         results = await search_documents(parsed_docs, "xyznonexistent123456")
-        # Results exist and are sorted by score (descending)
+        # Results exist
         assert len(results) > 0
-        for i in range(len(results) - 1):
-            assert results[i].score >= results[i + 1].score
 
     @pytest.mark.asyncio
-    async def test_results_sorted_by_score(self, parsed_docs: list) -> None:
+    async def test_results_sorted_by_relevance(self, parsed_docs: list) -> None:
+        # Results are sorted by: exact match, name distance, score
         results = await search_documents(parsed_docs, "auth")
         if len(results) > 1:
+            # Verify exact matches come first
             for i in range(len(results) - 1):
-                assert results[i].score >= results[i + 1].score
+                r1, r2 = results[i], results[i + 1]
+                # Exact match should come before non-exact
+                if r1.is_exact_match and not r2.is_exact_match:
+                    continue  # correct order
+                elif not r1.is_exact_match and r2.is_exact_match:
+                    raise AssertionError("Non-exact match before exact match")
+                # If same exact match status, check name distance
+                elif r1.is_exact_match == r2.is_exact_match:
+                    if r1.name_distance < r2.name_distance:
+                        continue  # correct order
+                    elif r1.name_distance == r2.name_distance:
+                        # Same distance, check score
+                        assert r1.score >= r2.score
+
+    @pytest.mark.asyncio
+    async def test_exact_match_priority(self, parsed_docs: list) -> None:
+        # Search for "User" - exact match should be first
+        results = await search_documents(parsed_docs, "User")
+        assert len(results) > 0
+        assert results[0].name == "User"
+        assert results[0].is_exact_match is True
+
+    @pytest.mark.asyncio
+    async def test_name_distance_sorting(self, parsed_docs: list) -> None:
+        # Search for "Auth" - AuthService should be first (shorter distance)
+        results = await search_documents(parsed_docs, "Auth")
+        assert len(results) > 0
+        # AuthService has smaller edit distance to "Auth" than other names
+        auth_result = next((r for r in results if r.name == "AuthService"), None)
+        assert auth_result is not None
 
     @pytest.mark.asyncio
     async def test_reference_match(self, parsed_docs: list) -> None:

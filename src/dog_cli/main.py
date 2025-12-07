@@ -8,6 +8,7 @@ import typer
 
 from dog_core import (
     ParseError,
+    PatchData,
     PrimitiveType,
     find_dog_files,
     format_file_in_place,
@@ -16,6 +17,8 @@ from dog_core import (
     lint_documents,
     list_documents,
     parse_documents,
+    parse_primitive_query,
+    patch_document,
     search_documents,
 )
 
@@ -205,7 +208,7 @@ def index(
 def search(  # noqa: C901
     query: Annotated[
         str,
-        typer.Argument(help="Search query string"),
+        typer.Argument(help="Search query string (use @/!/#/& prefix for type filter)"),
     ],
     path: Annotated[
         Path,
@@ -215,14 +218,6 @@ def search(  # noqa: C901
             help="Path to search in (default: current directory)",
         ),
     ] = Path("."),
-    type_filter: Annotated[
-        str | None,
-        typer.Option(
-            "--type",
-            "-t",
-            help="Filter by primitive type (Actor, Behavior, Component, Data, Project)",
-        ),
-    ] = None,
     limit: Annotated[
         int,
         typer.Option(
@@ -240,9 +235,19 @@ def search(  # noqa: C901
         ),
     ] = OutputFormat.text,
 ) -> None:
-    """Search DOG documents by name or content."""
+    """Search DOG documents by name or content.
+
+    Use primitive marks to filter by type:
+      @query - Actor
+      !query - Behavior
+      #query - Component
+      &query - Data
+    """
 
     async def _search() -> int:  # noqa: C901
+        # Parse primitive query for type filter
+        actual_query, ptype = parse_primitive_query(query)
+
         files = await find_dog_files(path)
 
         if not files:
@@ -261,20 +266,7 @@ def search(  # noqa: C901
                 typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
 
-        # Parse type filter
-        ptype: PrimitiveType | None = None
-        if type_filter:
-            try:
-                ptype = PrimitiveType(type_filter)
-            except ValueError:
-                valid = ", ".join(t.value for t in PrimitiveType)
-                if output == OutputFormat.json:
-                    typer.echo(json.dumps({"results": [], "error": f"Invalid type. Valid: {valid}"}))
-                else:
-                    typer.secho(f"Invalid type '{type_filter}'. Valid: {valid}", fg=typer.colors.RED)
-                return 1
-
-        results = await search_documents(docs, query, type_filter=ptype, limit=limit)
+        results = await search_documents(docs, actual_query, type_filter=ptype, limit=limit)
 
         if output == OutputFormat.json:
             typer.echo(json.dumps({"results": [r.to_dict() for r in results]}))
@@ -299,7 +291,7 @@ def search(  # noqa: C901
 def get(  # noqa: C901
     name: Annotated[
         str,
-        typer.Argument(help="Name of the primitive to get"),
+        typer.Argument(help="Name of the primitive to get (use @/!/#/& prefix for type filter)"),
     ],
     path: Annotated[
         Path,
@@ -309,14 +301,6 @@ def get(  # noqa: C901
             help="Path to search in (default: current directory)",
         ),
     ] = Path("."),
-    type_filter: Annotated[
-        str | None,
-        typer.Option(
-            "--type",
-            "-t",
-            help="Filter by primitive type (Actor, Behavior, Component, Data, Project)",
-        ),
-    ] = None,
     output: Annotated[
         OutputFormat,
         typer.Option(
@@ -326,9 +310,26 @@ def get(  # noqa: C901
         ),
     ] = OutputFormat.text,
 ) -> None:
-    """Get a DOG document by name with resolved references."""
+    """Get a DOG document by name with resolved references.
+
+    Use primitive marks to filter by type:
+      @name - Actor
+      !name - Behavior
+      #name - Component
+      &name - Data
+    """
 
     async def _get() -> int:  # noqa: C901
+        # Parse primitive query for type filter
+        actual_name, ptype = parse_primitive_query(name)
+
+        if not actual_name:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"error": "Name is required"}))
+            else:
+                typer.secho("Name is required", fg=typer.colors.RED)
+            return 1
+
         files = await find_dog_files(path)
 
         if not files:
@@ -347,20 +348,7 @@ def get(  # noqa: C901
                 typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
 
-        # Parse type filter
-        ptype: PrimitiveType | None = None
-        if type_filter:
-            try:
-                ptype = PrimitiveType(type_filter)
-            except ValueError:
-                valid = ", ".join(t.value for t in PrimitiveType)
-                if output == OutputFormat.json:
-                    typer.echo(json.dumps({"error": f"Invalid type. Valid: {valid}"}))
-                else:
-                    typer.secho(f"Invalid type '{type_filter}'. Valid: {valid}", fg=typer.colors.RED)
-                return 1
-
-        result = await get_document(docs, name, type_filter=ptype)
+        result = await get_document(docs, actual_name, type_filter=ptype)
 
         if result is None:
             if output == OutputFormat.json:
@@ -382,6 +370,10 @@ def get(  # noqa: C901
 
 @app.command(name="list")
 def list_cmd(  # noqa: C901
+    type_filter: Annotated[
+        str | None,
+        typer.Argument(help="Type filter: @ (Actor), ! (Behavior), # (Component), & (Data)"),
+    ] = None,
     path: Annotated[
         Path,
         typer.Option(
@@ -390,14 +382,6 @@ def list_cmd(  # noqa: C901
             help="Path to search in (default: current directory)",
         ),
     ] = Path("."),
-    type_filter: Annotated[
-        str | None,
-        typer.Option(
-            "--type",
-            "-t",
-            help="Filter by primitive type (Actor, Behavior, Component, Data, Project)",
-        ),
-    ] = None,
     output: Annotated[
         OutputFormat,
         typer.Option(
@@ -407,9 +391,28 @@ def list_cmd(  # noqa: C901
         ),
     ] = OutputFormat.text,
 ) -> None:
-    """List all DOG documents."""
+    """List all DOG documents.
+
+    Use primitive marks to filter by type:
+      @  - List Actors
+      !  - List Behaviors
+      #  - List Components
+      &  - List Data
+    """
 
     async def _list() -> int:  # noqa: C901
+        # Parse type filter from sigil
+        ptype: PrimitiveType | None = None
+        if type_filter:
+            _, ptype = parse_primitive_query(type_filter)
+            if ptype is None:
+                # Invalid filter - not a recognized sigil
+                if output == OutputFormat.json:
+                    typer.echo(json.dumps({"documents": [], "error": "Invalid filter. Use @, !, #, or &"}))
+                else:
+                    typer.secho("Invalid filter. Use @, !, #, or &", fg=typer.colors.RED)
+                return 1
+
         files = await find_dog_files(path)
 
         if not files:
@@ -427,19 +430,6 @@ def list_cmd(  # noqa: C901
             else:
                 typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
-
-        # Parse type filter
-        ptype: PrimitiveType | None = None
-        if type_filter:
-            try:
-                ptype = PrimitiveType(type_filter)
-            except ValueError:
-                valid = ", ".join(t.value for t in PrimitiveType)
-                if output == OutputFormat.json:
-                    typer.echo(json.dumps({"documents": [], "error": f"Invalid type. Valid: {valid}"}))
-                else:
-                    typer.secho(f"Invalid type '{type_filter}'. Valid: {valid}", fg=typer.colors.RED)
-                return 1
 
         results = await list_documents(docs, type_filter=ptype)
 
@@ -465,6 +455,137 @@ def list_cmd(  # noqa: C901
 
     exit_code = asyncio.run(_list())
     raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def patch(
+    name: Annotated[
+        str,
+        typer.Argument(help="Name of the primitive to patch (use @/!/#/& prefix for type filter)"),
+    ],
+    data: Annotated[
+        str,
+        typer.Option(
+            "--data",
+            "-d",
+            help='JSON patch data, e.g. \'{"sections": {"Description": "New content"}}\'',
+        ),
+    ],
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to search in (default: current directory)",
+        ),
+    ] = Path("."),
+) -> None:
+    """Patch a DOG document with JSON data to update specific sections.
+
+    Use primitive marks to filter by type:
+      @name - Actor
+      !name - Behavior
+      #name - Component
+      &name - Data
+
+    Example:
+      dog patch "@User" --data '{"sections": {"Description": "Updated description"}}'
+    """
+
+    async def _patch() -> int:
+        # Parse primitive query for type filter
+        actual_name, ptype = parse_primitive_query(name)
+
+        if not actual_name:
+            typer.secho("Name is required", fg=typer.colors.RED)
+            return 1
+
+        # Parse JSON data
+        try:
+            patch_dict = json.loads(data)
+            patch_data = PatchData(**patch_dict)
+        except json.JSONDecodeError as e:
+            typer.secho(f"Invalid JSON: {e}", fg=typer.colors.RED)
+            return 1
+        except ValueError as e:
+            typer.secho(f"Invalid patch data: {e}", fg=typer.colors.RED)
+            return 1
+
+        files = await find_dog_files(path)
+
+        if not files:
+            typer.echo(f"No .dog.md files found in {path}")
+            return 1
+
+        try:
+            docs = await parse_documents(files)
+        except ParseError as e:
+            typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            return 1
+
+        result = await patch_document(docs, actual_name, patch_data, type_filter=ptype)
+
+        if result.success:
+            typer.secho(f"Patched: {result.file_path}", fg=typer.colors.GREEN)
+            if result.updated_sections:
+                typer.echo(f"Updated sections: {', '.join(result.updated_sections)}")
+        else:
+            typer.secho(f"Error: {result.error}", fg=typer.colors.RED)
+
+        return 0 if result.success else 1
+
+    exit_code = asyncio.run(_patch())
+    raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def serve(
+    path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to directory containing .dog.md files",
+            exists=True,
+        ),
+    ] = Path("."),
+    host: Annotated[
+        str,
+        typer.Option(
+            "--host",
+            "-h",
+            help="Host to bind to",
+        ),
+    ] = "127.0.0.1",
+    port: Annotated[
+        int,
+        typer.Option(
+            "--port",
+            "-P",
+            help="Port to bind to",
+        ),
+    ] = 8000,
+    no_reload: Annotated[
+        bool,
+        typer.Option(
+            "--no-reload",
+            help="Disable hot-reload on file changes",
+        ),
+    ] = False,
+) -> None:
+    """Serve DOG documentation as HTML in the browser.
+
+    Starts a local web server that renders .dog.md files as HTML pages
+    with color-coded reference links. Hot-reload is enabled by default.
+    """
+    from dog_core.server import run_server
+
+    typer.echo("Starting DOG documentation server...")
+    typer.echo(f"Serving docs from: {path.resolve()}")
+    typer.echo(f"Open http://{host}:{port} in your browser")
+    if not no_reload:
+        typer.echo("Hot-reload enabled - changes will be reflected automatically")
+    typer.echo()
+
+    asyncio.run(run_server(path, host=host, port=port, reload=not no_reload))
 
 
 if __name__ == "__main__":

@@ -18,7 +18,9 @@ Provides fuzzy search across DOG documents using RapidFuzz. Calculates relevance
 ## Notes
 
 - Uses RapidFuzz for fuzzy string matching
+- Uses Levenshtein distance for name similarity
 - Supports token-based matching (word reordering)
 - Supports partial/substring matches
 - Name matches boosted 20% over content matches
 - Returns scores on 0-100 scale
+- Results sorted: exact matches first, then by name distance, then by score

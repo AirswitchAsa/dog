@@ -13,6 +13,33 @@ class PrimitiveType(str, Enum):
     DATA = "Data"
 
 
+SIGIL_MAP: dict[str, PrimitiveType] = {
+    "@": PrimitiveType.ACTOR,
+    "!": PrimitiveType.BEHAVIOR,
+    "#": PrimitiveType.COMPONENT,
+    "&": PrimitiveType.DATA,
+}
+
+
+def parse_primitive_query(query: str) -> tuple[str, PrimitiveType | None]:
+    """Parse a query string that may contain a primitive type sigil.
+
+    Examples:
+        "@User" -> ("User", PrimitiveType.ACTOR)
+        "!Login" -> ("Login", PrimitiveType.BEHAVIOR)
+        "User" -> ("User", None)
+        "@" -> ("", PrimitiveType.ACTOR)  # for listing all of a type
+
+    Returns:
+        Tuple of (name, type_filter) where type_filter is None if no sigil present.
+    """
+    if query and query[0] in SIGIL_MAP:
+        sigil = query[0]
+        name = query[1:].strip()
+        return name, SIGIL_MAP[sigil]
+    return query, None
+
+
 ALLOWED_SECTIONS: dict[PrimitiveType, set[str]] = {
     PrimitiveType.PROJECT: {
         "Description",

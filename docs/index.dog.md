@@ -2,7 +2,9 @@
 
 ## Description
 
-Project index for DOG CLI.
+**Documentation Oriented Grammar** — A Markdown-native format for system documentation that serves humans and AI agents alike.
+
+Available on: [pypi](https://pypi.org/project/dog-cli/)
 
 ## Actors
 
@@ -15,7 +17,9 @@ Project index for DOG CLI.
 - [Get](get.dog.md)
 - [Lint](lint.dog.md)
 - [List](list.dog.md)
+- [Patch](patch.dog.md)
 - [Search](search.dog.md)
+- [Serve](serve.dog.md)
 
 ## Components
 
@@ -25,7 +29,9 @@ Project index for DOG CLI.
 - [Indexer](indexer.dog.md)
 - [Linter](linter.dog.md)
 - [Parser](parser.dog.md)
+- [Patcher](patcher.dog.md)
 - [Searcher](searcher.dog.md)
+- [Server](server.dog.md)
 
 ## Data
 
@@ -33,6 +39,8 @@ Project index for DOG CLI.
 - [GetResult](get-result.dog.md)
 - [LintIssue](lint-issue.dog.md)
 - [LintResult](lint-result.dog.md)
+- [PatchData](patch-data.dog.md)
+- [PatchResult](patch-result.dog.md)
 - [ResolvedReference](resolved-reference.dog.md)
 - [SearchResult](search-result.dog.md)
 

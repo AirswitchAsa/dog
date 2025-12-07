@@ -5,15 +5,19 @@ from dog_core.indexer import generate_index
 from dog_core.linter import lint_documents
 from dog_core.models import (
     ALLOWED_SECTIONS,
+    SIGIL_MAP,
     DogDocument,
     InlineReference,
     LintIssue,
     LintResult,
     PrimitiveType,
     Section,
+    parse_primitive_query,
 )
 from dog_core.parser import ParseError, parse_document, parse_documents
+from dog_core.patcher import PatchData, PatchResult, patch_document
 from dog_core.search import SearchResult, search_documents
+from dog_core.server import DocServer, create_server, run_server
 
 
 """
@@ -24,12 +28,15 @@ __version__ = "2025.12.07"
 
 __all__ = [
     "ALLOWED_SECTIONS",
+    "SIGIL_MAP",
     "DogDocument",
     "GetResult",
     "InlineReference",
     "LintIssue",
     "LintResult",
     "ParseError",
+    "PatchData",
+    "PatchResult",
     "PrimitiveType",
     "ResolvedReference",
     "SearchResult",
@@ -44,5 +51,10 @@ __all__ = [
     "list_documents",
     "parse_document",
     "parse_documents",
+    "parse_primitive_query",
+    "patch_document",
     "search_documents",
+    "DocServer",
+    "create_server",
+    "run_server",
 ]

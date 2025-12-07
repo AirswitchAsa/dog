@@ -13,11 +13,11 @@ The `@User` runs the `dog list` command. The `#CLI` invokes `#Getter` to enumera
 
 - Documents displayed grouped by primitive type
 - Each entry shows name and file path
-- Optional type filtering
+- Type filtering via sigil argument
 - Supports text or JSON output formats
 
 ## Notes
 
 - Results are sorted by type, then by name
-- Use `--type` to filter by primitive type
+- Use sigil to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data)
 - Use `--output json` for programmatic consumption

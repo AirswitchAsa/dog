@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from rapidfuzz import fuzz
+from rapidfuzz.distance import Levenshtein
 
 from dog_core.models import DogDocument, PrimitiveType
 
@@ -12,6 +13,8 @@ class SearchResult(BaseModel):
     file_path: str
     score: float
     snippet: str
+    is_exact_match: bool = False
+    name_distance: int = 0
 
     def to_dict(self) -> dict:
         return {
@@ -86,7 +89,7 @@ def _score_references(query: str, doc: DogDocument) -> float:
     return best_score
 
 
-def _calculate_score(query: str, doc: DogDocument) -> tuple[float, str]:
+def _calculate_score(query: str, doc: DogDocument) -> tuple[float, str, bool, int]:
     """Calculate relevance score using RapidFuzz fuzzy matching.
 
     Uses multiple matching strategies:
@@ -94,9 +97,17 @@ def _calculate_score(query: str, doc: DogDocument) -> tuple[float, str]:
     - Token-based matching for flexible word order
     - Partial matching for substring matches
 
-    Returns (score, snippet) tuple. Score is 0-100, higher = more relevant.
+    Returns (score, snippet, is_exact_match, name_distance) tuple.
+    Score is 0-100, higher = more relevant.
     """
     header_snippet = f"# {doc.primitive_type.value}: {doc.name}"
+
+    # Check for exact name match (case-insensitive)
+    is_exact_match = query.lower() == doc.name.lower()
+
+    # Calculate name edit distance (Levenshtein)
+    name_distance = Levenshtein.distance(query.lower(), doc.name.lower())
+
     name_score = _score_name(query, doc)
     section_score, section_snippet = _score_sections(query, doc)
     ref_score = _score_references(query, doc)
@@ -106,10 +117,10 @@ def _calculate_score(query: str, doc: DogDocument) -> tuple[float, str]:
 
     # Return best score with appropriate snippet (cap at 100)
     if boosted_name_score >= section_score and boosted_name_score >= ref_score:
-        return min(boosted_name_score, 100.0), header_snippet
+        return min(boosted_name_score, 100.0), header_snippet, is_exact_match, name_distance
     if section_score >= ref_score:
-        return section_score, section_snippet
-    return ref_score, header_snippet
+        return section_score, section_snippet, is_exact_match, name_distance
+    return ref_score, header_snippet, is_exact_match, name_distance
 
 
 async def search_documents(
@@ -136,7 +147,7 @@ async def search_documents(
         if type_filter and doc.primitive_type != type_filter:
             continue
 
-        score, snippet = _calculate_score(query, doc)
+        score, snippet, is_exact_match, name_distance = _calculate_score(query, doc)
 
         results.append(
             SearchResult(
@@ -145,9 +156,11 @@ async def search_documents(
                 file_path=str(doc.file_path),
                 score=score,
                 snippet=snippet or f"# {doc.primitive_type.value}: {doc.name}",
+                is_exact_match=is_exact_match,
+                name_distance=name_distance,
             )
         )
 
-    # Sort by score descending and return top k
-    results.sort(key=lambda r: r.score, reverse=True)
+    # Sort: exact matches first, then by name distance (fewer = better), then by score
+    results.sort(key=lambda r: (-int(r.is_exact_match), r.name_distance, -r.score))
     return results[:limit]

@@ -17,11 +17,11 @@ Reference resolution shows:
 
 - Full document content displayed with resolved references
 - Exit code 0 if found, 1 if not found
-- Optional type filtering
+- Type filtering via sigil prefix
 - Supports text or JSON output formats
 
 ## Notes
 
 - Name matching is case-insensitive
-- Use `--type` to filter by primitive type
+- Use sigil prefix to filter by type: @ (Actor), ! (Behavior), # (Component), & (Data)
 - Use `--output json` for programmatic consumption

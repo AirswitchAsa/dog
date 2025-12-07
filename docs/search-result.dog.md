@@ -11,6 +11,8 @@ Represents a single search result with relevance score and contextual snippet.
 - file_path: path to the source file
 - score: relevance score (0-100, higher is better)
 - snippet: contextual text snippet
+- is_exact_match: boolean for exact name match (case-insensitive)
+- name_distance: Levenshtein edit distance from query to name
 
 ## Notes
 

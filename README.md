@@ -38,10 +38,13 @@ dog index docs/ --name "My Project"
 dog search "login" --path docs/
 
 # Get a specific document
-dog get "User" --path docs/
+dog get "@User" --path docs/
 
 # List all documents
 dog list --path docs/
+
+# Serve documentation in browser
+dog serve docs/
 ```
 
 ### Example
@@ -117,16 +120,17 @@ Search documents using fuzzy matching. Returns top-k results sorted by relevance
 
 ```bash
 dog search "login"
-dog search "auth" --type Component
+dog search "#auth"              # Filter by Component type
 dog search "user" --limit 5 --output json
 ```
 
 | Option           | Description                        |
 | ---------------- | ---------------------------------- |
 | `--path`, `-p`   | Directory to search (default: `.`) |
-| `--type`, `-t`   | Filter by primitive type           |
 | `--limit`, `-l`  | Max results (default: 10)          |
 | `--output`, `-o` | `text` or `json`                   |
+
+Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
 
 ### `dog get <name>`
 
@@ -134,15 +138,16 @@ Get a document by name with resolved references.
 
 ```bash
 dog get "Login Flow"
-dog get "User" --type Actor
-dog get "AuthService" --output json
+dog get "@User"                 # Get Actor named User
+dog get "#AuthService" --output json
 ```
 
 | Option           | Description                        |
 | ---------------- | ---------------------------------- |
 | `--path`, `-p`   | Directory to search (default: `.`) |
-| `--type`, `-t`   | Filter by primitive type           |
 | `--output`, `-o` | `text` or `json`                   |
+
+Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
 
 ### `dog list`
 
@@ -150,15 +155,52 @@ List all documents.
 
 ```bash
 dog list
-dog list --type Behavior
+dog list !                      # List only Behaviors
 dog list --output json
 ```
 
 | Option           | Description                        |
 | ---------------- | ---------------------------------- |
 | `--path`, `-p`   | Directory to search (default: `.`) |
-| `--type`, `-t`   | Filter by primitive type           |
 | `--output`, `-o` | `text` or `json`                   |
+
+Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
+
+### `dog patch <name>`
+
+Update specific sections of a DOG document programmatically.
+
+```bash
+dog patch "@User" --data '{"sections": {"Description": "Updated description"}}'
+dog patch "Login" --data '{"sections": {"Outcome": "New outcome"}}'
+```
+
+| Option         | Description                        |
+| -------------- | ---------------------------------- |
+| `--path`, `-p` | Directory to search (default: `.`) |
+| `--data`, `-d` | JSON patch data                    |
+
+### `dog serve <path>`
+
+Serve DOG documentation as HTML in the browser with hot-reload.
+
+```bash
+dog serve docs/
+dog serve --host 0.0.0.0 --port 3000
+dog serve docs/ --no-reload
+```
+
+| Option         | Description                         |
+| -------------- | ----------------------------------- |
+| `--host`, `-h` | Host to bind (default: `127.0.0.1`) |
+| `--port`, `-P` | Port to bind (default: `8000`)      |
+| `--no-reload`  | Disable hot-reload on file changes  |
+
+Features:
+- Color-coded reference links (red=Actor, blue=Behavior, purple=Component, green=Data)
+- Renders `index.dog.md` as homepage when present
+- Automatic favicon discovery (favicon.png or dog.png)
+- Hot-reload on file changes
 
 ---
 
@@ -253,17 +295,16 @@ dog list --output json
 
 ---
 
-## Design Principles
+## Why DOG?
 
-**Markdown-native** — No custom DSLs. Files render anywhere without special tooling.
+| Approach                | Trade-offs                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **RAG/Vector Search**   | Requires embeddings, chunking strategy, retrieval tuning. Context can be fragmented or miss cross-references.            |
+| **Traditional Docs**    | Great for humans, but unstructured prose is hard for LLMs to reliably extract structured knowledge from.                 |
+| **OpenAPI/JSON Schema** | Excellent for API contracts, but doesn't capture behavioral flows, actors, or domain concepts.                           |
+| **DOG**                 | Markdown-native, no infra needed. Structured enough for LLM parsing, readable enough for humans. Single source of truth. |
 
-**Light structure, high semantic value** — Predictable headings and cross-references that LLMs can reliably parse.
-
-**Unified source of truth** — One place for product docs, concept definitions, developer references, and AI context.
-
-**Flat taxonomy** — No hierarchies. Concepts link through explicit naming.
-
-**Simple linting** — Validates references, sections, and naming. Deeper logic left to authors and AI reasoning.
+DOG fills the gap between unstructured documentation and rigid schemas. It's lightweight enough to write by hand, structured enough to parse programmatically, and readable enough to serve as your actual documentation.
 
 ---
 

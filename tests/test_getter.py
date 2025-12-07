@@ -132,7 +132,8 @@ class TestGetResult:
         assert d["file"] == "/path/to/test.dog.md"
         assert len(d["sections"]) == 1
         assert len(d["references"]) == 1
-        assert d["content"] == "# Actor: Test\n\n## Description\n\nTest desc"
+        # raw content is no longer included in JSON output
+        assert "content" not in d
 
     def test_to_text_with_references(self) -> None:
         result = GetResult(
