@@ -2,4 +2,4 @@
 dog-cli package.
 """
 
-__version__ = "2025.12.7.post1"
+__version__ = "2025.12.7.post2"

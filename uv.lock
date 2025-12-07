@@ -82,7 +82,7 @@ wheels = [
 
 [[package]]
 name = "dog-cli"
-version = "2025.12.7.post1"
+version = "2025.12.7.post2"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
