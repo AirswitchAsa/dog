@@ -14,7 +14,7 @@
       "Bash(git show:*)",
       "Bash(uv sync:*)",
       "Bash(uv run python:*)",
-      "Bash(uv run dog lint:*)"
+      "Bash(uv run dog:*)"
     ],
     "deny": [],
     "ask": [

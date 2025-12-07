@@ -16,10 +16,11 @@ def make_doc(
     ptype: PrimitiveType,
     sections: list[str] | None = None,
     references: list[tuple[str, PrimitiveType]] | None = None,
+    file_path: Path | None = None,
 ) -> DogDocument:
     """Helper to create test documents."""
     return DogDocument(
-        file_path=Path(f"/test/{name.lower()}.dog.md"),
+        file_path=file_path or Path(f"/test/{name.lower()}.dog.md"),
         primitive_type=ptype,
         name=name,
         sections=[Section(name=s, content="content", line_number=i + 2) for i, s in enumerate(sections or [])],
@@ -139,4 +140,44 @@ class TestLintDocuments:
 
         result = await lint_documents(docs)
         assert not result.has_errors
+        assert len(result.warnings) == 0
+
+    @pytest.mark.asyncio
+    async def test_duplicate_file_names(self) -> None:
+        """Duplicate file names should produce warnings."""
+        docs = [
+            make_doc(
+                "User",
+                PrimitiveType.ACTOR,
+                file_path=Path("/docs/actors/user.dog.md"),
+            ),
+            make_doc(
+                "UserData",
+                PrimitiveType.DATA,
+                file_path=Path("/docs/data/user.dog.md"),
+            ),
+        ]
+
+        result = await lint_documents(docs)
+        assert len(result.warnings) == 2
+        assert "Duplicate file name 'user.dog.md'" in result.warnings[0].message
+        assert "Duplicate file name 'user.dog.md'" in result.warnings[1].message
+
+    @pytest.mark.asyncio
+    async def test_no_duplicate_warning_for_unique_names(self) -> None:
+        """Unique file names should not produce warnings."""
+        docs = [
+            make_doc(
+                "User",
+                PrimitiveType.ACTOR,
+                file_path=Path("/docs/actors/user.dog.md"),
+            ),
+            make_doc(
+                "Order",
+                PrimitiveType.DATA,
+                file_path=Path("/docs/data/order.dog.md"),
+            ),
+        ]
+
+        result = await lint_documents(docs)
         assert len(result.warnings) == 0

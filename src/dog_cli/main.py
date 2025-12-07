@@ -10,8 +10,11 @@ from dog_core import (
     ParseError,
     PatchData,
     PrimitiveType,
+    export_documents,
     find_dog_files,
+    find_refs,
     format_file_in_place,
+    generate_graph,
     generate_index,
     get_document,
     lint_documents,
@@ -535,6 +538,189 @@ def patch(
         return 0 if result.success else 1
 
     exit_code = asyncio.run(_patch())
+    raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def refs(
+    query: Annotated[
+        str,
+        typer.Argument(help="Name of the primitive to find references to (use @/!/#/& prefix for type filter)"),
+    ],
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to search in (default: current directory)",
+        ),
+    ] = Path("."),
+    output: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output format",
+        ),
+    ] = OutputFormat.text,
+) -> None:
+    """Find all documents that reference a given primitive (reverse lookup).
+
+    Use primitive marks to filter by type:
+      @name - Actor
+      !name - Behavior
+      #name - Component
+      &name - Data
+
+    Example:
+      dog refs "#AuthService"  # Find everything that references AuthService
+    """
+
+    async def _refs() -> int:
+        files = await find_dog_files(path)
+
+        if not files:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"error": "No .dog.md files found"}))
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 1
+
+        try:
+            docs = await parse_documents(files)
+        except ParseError as e:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"error": str(e)}))
+            else:
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            return 1
+
+        result = await find_refs(docs, query)
+
+        if output == OutputFormat.json:
+            typer.echo(json.dumps(result.to_dict()))
+        else:
+            typer.echo(result.to_text())
+
+        return 0
+
+    exit_code = asyncio.run(_refs())
+    raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def graph(
+    root: Annotated[
+        str | None,
+        typer.Argument(help="Optional root node to generate subgraph from (use @/!/#/& prefix)"),
+    ] = None,
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to search in (default: current directory)",
+        ),
+    ] = Path("."),
+) -> None:
+    """Generate a DOT format dependency graph.
+
+    Output can be piped to graphviz for rendering:
+      dog graph | dot -Tpng -o graph.png
+      dog graph "!Login" | dot -Tsvg -o login.svg
+
+    Use primitive marks to filter root by type:
+      @name - Actor
+      !name - Behavior
+      #name - Component
+      &name - Data
+    """
+
+    async def _graph() -> int:
+        files = await find_dog_files(path)
+
+        if not files:
+            typer.echo(f"No .dog.md files found in {path}", err=True)
+            return 1
+
+        try:
+            docs = await parse_documents(files)
+        except ParseError as e:
+            typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
+            return 1
+
+        dot_output = await generate_graph(docs, root=root)
+        typer.echo(dot_output)
+
+        return 0
+
+    exit_code = asyncio.run(_graph())
+    raise typer.Exit(code=exit_code)
+
+
+@app.command(name="export")
+def export_cmd(
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to search in (default: current directory)",
+        ),
+    ] = Path("."),
+    type_filter: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Type filter: @ (Actor), ! (Behavior), # (Component), & (Data)",
+        ),
+    ] = None,
+    no_raw: Annotated[
+        bool,
+        typer.Option(
+            "--no-raw",
+            help="Exclude raw markdown content from output",
+        ),
+    ] = False,
+) -> None:
+    """Export all DOG documents as JSON.
+
+    Outputs a JSON array of all documents with their sections and references.
+    Useful for feeding context to AI agents.
+
+    Example:
+      dog export -p docs/ > context.json
+      dog export -t ! -p docs/  # Export only behaviors
+    """
+
+    async def _export() -> int:
+        # Parse type filter from sigil
+        ptype: PrimitiveType | None = None
+        if type_filter:
+            _, ptype = parse_primitive_query(type_filter)
+            if ptype is None:
+                typer.secho("Invalid filter. Use @, !, #, or &", fg=typer.colors.RED, err=True)
+                return 1
+
+        files = await find_dog_files(path)
+
+        if not files:
+            typer.echo(json.dumps({"documents": [], "error": "No .dog.md files found"}))
+            return 1
+
+        try:
+            docs = await parse_documents(files)
+        except ParseError as e:
+            typer.echo(json.dumps({"documents": [], "error": str(e)}))
+            return 1
+
+        results = await export_documents(docs, type_filter=ptype, include_raw=not no_raw)
+        typer.echo(json.dumps({"documents": results, "count": len(results)}))
+
+        return 0
+
+    exit_code = asyncio.run(_export())
     raise typer.Exit(code=exit_code)
 
 

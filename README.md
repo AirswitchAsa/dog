@@ -43,6 +43,15 @@ dog get "@User" --path docs/
 # List all documents
 dog list --path docs/
 
+# Find what references a primitive
+dog refs "#AuthService" --path docs/
+
+# Generate dependency graph
+dog graph --path docs/ | dot -Tpng -o graph.png
+
+# Export all docs as JSON
+dog export --path docs/ > context.json
+
 # Serve documentation in browser
 dog serve docs/
 ```
@@ -83,13 +92,16 @@ Example: "`@User` submits `&Order` to `#CartService`, triggering `!Checkout`"
 
 ## CLI Reference
 
-**IMPORTANT**: Always use `-o json` for `search`, `get`, `list` to get structured output.
+**IMPORTANT**: Always use `-o json` for `search`, `get`, `list`, `refs` to get structured output.
 
 | Command  | Usage                                 | Key Options                                                            |
 | -------- | ------------------------------------- | ---------------------------------------------------------------------- |
 | `search` | `uv run dog search <query> -o json`   | `-l` limit, `-p` path. Prefix with sigil to filter: `@query`, `!query` |
 | `get`    | `uv run dog get <name> -o json`       | `-p` path. Use sigil: `@User`, `!Checkout`                             |
 | `list`   | `uv run dog list [sigil] -o json`     | `-p` path. Filter: `@`, `!`, `#`, `&`                                  |
+| `refs`   | `uv run dog refs <name> -o json`      | `-p` path. Reverse lookup: what references this?                       |
+| `export` | `uv run dog export -p <path>`         | `-t` type filter, `--no-raw`. Bulk export for AI context.              |
+| `graph`  | `uv run dog graph [root] -p <path>`   | DOT output. Pipe to graphviz: `\| dot -Tpng -o graph.png`              |
 | `lint`   | `uv run dog lint <path>`              | Validate structure/refs. Run before commits.                           |
 | `format` | `uv run dog format <path>`            | `--check` to verify without modifying                                  |
 | `patch`  | `uv run dog patch <name> -d '<json>'` | Update sections: `'{"sections": {"Description": "..."}}'`              |
@@ -251,6 +263,54 @@ dog patch "Login" --data '{"sections": {"Outcome": "New outcome"}}'
 | -------------- | ---------------------------------- |
 | `--path`, `-p` | Directory to search (default: `.`) |
 | `--data`, `-d` | JSON patch data                    |
+
+### `dog refs <name>`
+
+Find all documents that reference a given primitive (reverse lookup).
+
+```bash
+dog refs "#AuthService"         # What references AuthService?
+dog refs "@User" --output json  # JSON output
+```
+
+| Option           | Description                        |
+| ---------------- | ---------------------------------- |
+| `--path`, `-p`   | Directory to search (default: `.`) |
+| `--output`, `-o` | `text` or `json`                   |
+
+Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
+
+### `dog graph [root]`
+
+Generate a DOT format dependency graph for visualization.
+
+```bash
+dog graph                              # Full graph
+dog graph "!Login"                     # Subgraph from Login behavior
+dog graph -p docs/ | dot -Tpng -o graph.png  # Render with graphviz
+```
+
+| Option         | Description                        |
+| -------------- | ---------------------------------- |
+| `--path`, `-p` | Directory to search (default: `.`) |
+
+Output is DOT format, pipe to graphviz (`dot`, `neato`, etc.) for rendering.
+
+### `dog export`
+
+Export all DOG documents as JSON for AI agent consumption.
+
+```bash
+dog export -p docs/                    # Export all docs
+dog export -t ! -p docs/               # Export only Behaviors
+dog export --no-raw -p docs/           # Exclude raw markdown
+```
+
+| Option         | Description                                        |
+| -------------- | -------------------------------------------------- |
+| `--path`, `-p` | Directory to search (default: `.`)                 |
+| `--type`, `-t` | Type filter: `@` (Actor), `!` (Behavior), `#`, `&` |
+| `--no-raw`     | Exclude raw markdown content from output           |
 
 ### `dog serve <path>`
 

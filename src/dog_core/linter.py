@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from dog_core.models import (
     ALLOWED_SECTIONS,
     DogDocument,
@@ -7,13 +9,14 @@ from dog_core.models import (
 )
 
 
-async def lint_documents(docs: list[DogDocument]) -> LintResult:
+async def lint_documents(docs: list[DogDocument]) -> LintResult:  # noqa: C901
     """Lint a collection of DOG documents.
 
     Validates:
     - Sections are allowed for the primitive type
     - Inline references point to existing primitives
     - Referenced types match the annotation style
+    - No duplicate file names (causes confusion in dog serve)
 
     Args:
         docs: List of parsed DogDocuments
@@ -26,8 +29,30 @@ async def lint_documents(docs: list[DogDocument]) -> LintResult:
     # Build index of all known primitives
     primitives: dict[PrimitiveType, set[str]] = {ptype: set() for ptype in PrimitiveType}
 
+    # Track file names to detect duplicates
+    file_names: dict[str, list[str]] = {}  # name -> list of file paths
+
     for doc in docs:
         primitives[doc.primitive_type].add(doc.name)
+        # Track by file stem (e.g., "user" from "user.dog.md")
+        stem = doc.file_path.stem.removesuffix(".dog")
+        if stem not in file_names:
+            file_names[stem] = []
+        file_names[stem].append(str(doc.file_path))
+
+    # Check for duplicate file names
+    for name, paths in file_names.items():
+        if len(paths) > 1:
+            for path in paths:
+                issues.append(
+                    LintIssue(
+                        file_path=Path(path),
+                        line_number=1,
+                        message=f"Duplicate file name '{name}.dog.md' also exists at: "
+                        f"{', '.join(p for p in paths if p != path)}",
+                        severity="warning",
+                    )
+                )
 
     # Validate each document
     for doc in docs:

@@ -2,9 +2,7 @@
 
 ## Description
 
-**Documentation Oriented Grammar** — A Markdown-native format for system documentation that serves humans and AI agents alike.
-
-Available on: [pypi](https://pypi.org/project/dog-cli/)
+Project index for DOG CLI.
 
 ## Actors
 
@@ -12,12 +10,15 @@ Available on: [pypi](https://pypi.org/project/dog-cli/)
 
 ## Behaviors
 
+- [Export](export.dog.md)
 - [Format](format.dog.md)
 - [Generate Index](generate-index.dog.md)
 - [Get](get.dog.md)
+- [Graph](graph.dog.md)
 - [Lint](lint.dog.md)
 - [List](list.dog.md)
 - [Patch](patch.dog.md)
+- [Refs](refs.dog.md)
 - [Search](search.dog.md)
 - [Serve](serve.dog.md)
 

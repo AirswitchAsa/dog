@@ -2,7 +2,7 @@
 
 ## Description
 
-The command-line interface component built with Typer. Provides the `dog` command with subcommands for `!Lint`, `!Format`, `!Generate Index`, `!Search`, `!Get`, `!List`, `!Patch`, and `!Serve` operations. Handles argument parsing, user feedback, and exit codes.
+The command-line interface component built with Typer. Provides the `dog` command with subcommands for `!Lint`, `!Format`, `!Generate Index`, `!Search`, `!Get`, `!List`, `!Patch`, `!Refs`, `!Graph`, `!Export`, and `!Serve` operations. Handles argument parsing, user feedback, and exit codes.
 
 ## State
 
@@ -19,6 +19,9 @@ The command-line interface component built with Typer. Provides the `dog` comman
 - get_command
 - list_command
 - patch_command
+- refs_command
+- graph_command
+- export_command
 - serve_command
 
 ## Notes

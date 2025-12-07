@@ -74,19 +74,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             margin-bottom: 4rem;
         }}
         header a {{
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
             text-decoration: none;
             color: var(--black);
             font-weight: 600;
             font-size: 13px;
             letter-spacing: 0.02em;
             text-transform: uppercase;
-        }}
-        header img {{
-            width: 24px;
-            height: 24px;
         }}
         header a:hover {{
             opacity: 0.6;
@@ -172,10 +165,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="page">
         <header>
-            <a href="/">
-                <img src="/favicon.png" alt="">
-                <span>Documentation</span>
-            </a>
+            <a href="/">Documentation</a>
         </header>
         <main class="content">
             {content}
