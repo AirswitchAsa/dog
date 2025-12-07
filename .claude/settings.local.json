@@ -13,7 +13,8 @@
       "Bash(uv run pyright:*)",
       "Bash(git show:*)",
       "Bash(uv sync:*)",
-      "Bash(uv run python:*)"
+      "Bash(uv run python:*)",
+      "Bash(uv run dog lint:*)"
     ],
     "deny": [],
     "ask": [

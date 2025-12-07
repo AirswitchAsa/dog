@@ -24,7 +24,7 @@ from dog_core.server import DocServer, create_server, run_server
 dog-core package.
 """
 
-__version__ = "2025.12.07"
+__version__ = "2025.12.7.post1"
 
 __all__ = [
     "ALLOWED_SECTIONS",

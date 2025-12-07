@@ -17,9 +17,9 @@ Available on: [pypi](https://pypi.org/project/dog-cli/)
 ### Installation
 
 ```bash
-pip install dog
+pip install dog-cli
 # or with uv
-uv add dog
+uv add dog-cli
 ```
 
 ### Basic Usage
