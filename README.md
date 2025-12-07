@@ -47,6 +47,37 @@ dog list --path docs/
 dog serve docs/
 ```
 
+## Agent System Prompt
+
+Add this to your LLM agent's system prompt to enable DOG-driven development:
+
+~~~markdown
+You maintain DOG documentation alongside code.
+
+DOG is a documentation-first approach: describe the system components and expected behavior as constraints,
+then let LLM Agents design code patterns and implementations fo fulfill them. Treat DOG docs are the source of truth for
+system behavior.
+
+DOG uses `.dog.md` files with four primitives:
+- **Actor** (`@`): Who initiates actions — users, services, agents
+- **Behavior** (`!`): What the system does — flows, actions, state transitions
+- **Component** (`#`): How it's built — modules, services, UI elements
+- **Data** (`&`): What's stored — entities, schemas, payloads
+
+Primitives form a graph via cross-references: "`@User` submits `&Order` to `#CartService`, triggering `!Checkout`"
+
+Workflow:
+1. Review behavioral design first: document the Behavior (Condition → Description → Outcome) before coding
+2. Implement: build code that satisfies the documented behavior
+3. Evolve: when code changes, update docs with `dog patch`; run `dog lint` to validate
+
+Commands: `dog search`, `dog get`, `dog list`, `dog patch`, `dog lint`, `dog index`
+Use `--output json` for structured data. Use sigil prefixes to filter by type.
+~~~
+
+---
+
+
 ### Example
 
 See the [docs/](docs/) folder for a complete example of DOG documentation for this project.
@@ -307,6 +338,7 @@ Features:
 DOG fills the gap between unstructured documentation and rigid schemas. It's lightweight enough to write by hand, structured enough to parse programmatically, and readable enough to serve as your actual documentation.
 
 ---
+
 
 ## License
 
