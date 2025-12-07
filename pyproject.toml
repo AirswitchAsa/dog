@@ -1,10 +1,36 @@
 [project]
-name = "dog"
+name = "dog-cli"
 authors = [{ name = "Qian Zhang", email = "contact@qzsh.email" }]
-version = "0.1.1"
-
+version = "2025.12.7"
+description = "Documentation Oriented Grammar (DOG) CLI Tool"
+readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.13, <3.14"
-dependencies = ["marko>=2.2.1", "pydantic>=2.12", "typer>=0.20.0"]
+keywords = [
+  "dog",
+  "documentation",
+  "markdown",
+  "cli",
+  "tool",
+  "nlp",
+  "llm",
+  "ai",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "License :: Other/Proprietary License",
+  "Operating System :: OS Independent",
+]
+
+
+dependencies = [
+  "marko>=2.2.1",
+  "pydantic>=2.12",
+  "rapidfuzz>=3.0",
+  "typer>=0.20.0",
+]
 
 [project.scripts]
 dog = "dog_cli.main:app"

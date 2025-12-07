@@ -1,4 +1,6 @@
 import asyncio
+import json
+from enum import Enum
 from pathlib import Path
 from typing import Annotated
 
@@ -6,12 +8,21 @@ import typer
 
 from dog_core import (
     ParseError,
+    PrimitiveType,
     find_dog_files,
     format_file_in_place,
     generate_index,
+    get_document,
     lint_documents,
+    list_documents,
     parse_documents,
+    search_documents,
 )
+
+
+class OutputFormat(str, Enum):
+    text = "text"
+    json = "json"
 
 
 app = typer.Typer(
@@ -187,6 +198,272 @@ def index(
         return 0
 
     exit_code = asyncio.run(_index())
+    raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def search(  # noqa: C901
+    query: Annotated[
+        str,
+        typer.Argument(help="Search query string"),
+    ],
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to search in (default: current directory)",
+        ),
+    ] = Path("."),
+    type_filter: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter by primitive type (Actor, Behavior, Component, Data, Project)",
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            "-l",
+            help="Maximum number of results",
+        ),
+    ] = 10,
+    output: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output format",
+        ),
+    ] = OutputFormat.text,
+) -> None:
+    """Search DOG documents by name or content."""
+
+    async def _search() -> int:  # noqa: C901
+        files = await find_dog_files(path)
+
+        if not files:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"results": [], "error": "No .dog.md files found"}))
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 1
+
+        try:
+            docs = await parse_documents(files)
+        except ParseError as e:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"results": [], "error": str(e)}))
+            else:
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            return 1
+
+        # Parse type filter
+        ptype: PrimitiveType | None = None
+        if type_filter:
+            try:
+                ptype = PrimitiveType(type_filter)
+            except ValueError:
+                valid = ", ".join(t.value for t in PrimitiveType)
+                if output == OutputFormat.json:
+                    typer.echo(json.dumps({"results": [], "error": f"Invalid type. Valid: {valid}"}))
+                else:
+                    typer.secho(f"Invalid type '{type_filter}'. Valid: {valid}", fg=typer.colors.RED)
+                return 1
+
+        results = await search_documents(docs, query, type_filter=ptype, limit=limit)
+
+        if output == OutputFormat.json:
+            typer.echo(json.dumps({"results": [r.to_dict() for r in results]}))
+        else:
+            if not results:
+                typer.echo(f"No results found for '{query}'")
+                return 0
+
+            for r in results:
+                typer.secho(f"{r.primitive_type.value}: {r.name}", fg=typer.colors.GREEN)
+                typer.echo(f"  File: {r.file_path}")
+                typer.echo(f"  {r.snippet}")
+                typer.echo()
+
+        return 0
+
+    exit_code = asyncio.run(_search())
+    raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def get(  # noqa: C901
+    name: Annotated[
+        str,
+        typer.Argument(help="Name of the primitive to get"),
+    ],
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to search in (default: current directory)",
+        ),
+    ] = Path("."),
+    type_filter: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter by primitive type (Actor, Behavior, Component, Data, Project)",
+        ),
+    ] = None,
+    output: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output format",
+        ),
+    ] = OutputFormat.text,
+) -> None:
+    """Get a DOG document by name with resolved references."""
+
+    async def _get() -> int:  # noqa: C901
+        files = await find_dog_files(path)
+
+        if not files:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"error": "No .dog.md files found"}))
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 1
+
+        try:
+            docs = await parse_documents(files)
+        except ParseError as e:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"error": str(e)}))
+            else:
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            return 1
+
+        # Parse type filter
+        ptype: PrimitiveType | None = None
+        if type_filter:
+            try:
+                ptype = PrimitiveType(type_filter)
+            except ValueError:
+                valid = ", ".join(t.value for t in PrimitiveType)
+                if output == OutputFormat.json:
+                    typer.echo(json.dumps({"error": f"Invalid type. Valid: {valid}"}))
+                else:
+                    typer.secho(f"Invalid type '{type_filter}'. Valid: {valid}", fg=typer.colors.RED)
+                return 1
+
+        result = await get_document(docs, name, type_filter=ptype)
+
+        if result is None:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"error": f"Not found: {name}"}))
+            else:
+                typer.secho(f"Not found: {name}", fg=typer.colors.RED)
+            return 1
+
+        if output == OutputFormat.json:
+            typer.echo(json.dumps(result.to_dict()))
+        else:
+            typer.echo(result.to_text())
+
+        return 0
+
+    exit_code = asyncio.run(_get())
+    raise typer.Exit(code=exit_code)
+
+
+@app.command(name="list")
+def list_cmd(  # noqa: C901
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            "-p",
+            help="Path to search in (default: current directory)",
+        ),
+    ] = Path("."),
+    type_filter: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter by primitive type (Actor, Behavior, Component, Data, Project)",
+        ),
+    ] = None,
+    output: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output format",
+        ),
+    ] = OutputFormat.text,
+) -> None:
+    """List all DOG documents."""
+
+    async def _list() -> int:  # noqa: C901
+        files = await find_dog_files(path)
+
+        if not files:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"documents": []}))
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 0
+
+        try:
+            docs = await parse_documents(files)
+        except ParseError as e:
+            if output == OutputFormat.json:
+                typer.echo(json.dumps({"documents": [], "error": str(e)}))
+            else:
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            return 1
+
+        # Parse type filter
+        ptype: PrimitiveType | None = None
+        if type_filter:
+            try:
+                ptype = PrimitiveType(type_filter)
+            except ValueError:
+                valid = ", ".join(t.value for t in PrimitiveType)
+                if output == OutputFormat.json:
+                    typer.echo(json.dumps({"documents": [], "error": f"Invalid type. Valid: {valid}"}))
+                else:
+                    typer.secho(f"Invalid type '{type_filter}'. Valid: {valid}", fg=typer.colors.RED)
+                return 1
+
+        results = await list_documents(docs, type_filter=ptype)
+
+        if output == OutputFormat.json:
+            typer.echo(json.dumps({"documents": results}))
+        else:
+            if not results:
+                typer.echo("No documents found")
+                return 0
+
+            # Group by type
+            by_type: dict[str, list[dict]] = {}
+            for r in results:
+                by_type.setdefault(r["type"], []).append(r)
+
+            for ptype_name, items in by_type.items():
+                typer.secho(f"\n{ptype_name}s:", fg=typer.colors.GREEN, bold=True)
+                for item in items:
+                    typer.echo(f"  {item['name']}")
+                    typer.echo(f"    {item['file']}")
+
+        return 0
+
+    exit_code = asyncio.run(_list())
     raise typer.Exit(code=exit_code)
 
 

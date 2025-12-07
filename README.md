@@ -1,85 +1,172 @@
-# **`.dog.md`**
+# DOG
 
-**Documentation Oriented Grammar (DOG)**
 
----
+<p align="center">
+  <img src="dog.png" alt="DOG" width="200">
+</p>
 
-## **1. Overview**
 
-`.dog.md` is a Markdown-native specification format used to describe system concepts in sphaere.
-A `.dog.md` file defines exactly one primitive type — **Project**, **Actor**, **Behavior**, **Component**, or **Data** — using light structural conventions embedded in standard Markdown.
+**Documentation Oriented Grammar** — A Markdown-native format for system documentation that serves humans and AI agents alike.
 
-DOG is designed to serve simultaneously as:
-
-* **Human-readable system documentation**
-* **A structured LLM knowledge base**
-* **A behavioral reference library for AI-assisted testing**
-
-The format preserves Markdown compatibility while adding minimal, machine-checkable structure.
+Available on: [pypi](https://pypi.org/project/dog-cli/)
 
 ---
 
-## **2. Rationale**
+## Quick Start
 
-The design of `.dog.md` adheres to the following principles:
+### Installation
 
-### **Markdown-native**
-
-The format avoids custom DSLs or fenced code blocks. Everything remains valid Markdown so files can be rendered anywhere without special tooling.
-
-### **Light structure, high semantic value**
-
-DOG introduces predictable headings and cross-referencing conventions that allow LLMs to reliably understand system concepts without imposing rigid schemas or formal semantics.
-
-### **Unified source of truth**
-
-`.dog.md` files act as a central repository for:
-
-* Product documentation
-* Concept definitions
-* Expected behavior descriptions
-* Developer references
-* AI grounding context
-* Behavior-driven testing narratives
-
-This ensures that human authors, AI coding agents, and AI test agents work from the same conceptual base.
-
-### **Flat taxonomy**
-
-Primitive types are equal, with no hierarchies or dot grammar. Concepts link to each other through explicit naming, enabling clear cross-referencing and easy incremental evolution.
-
-### **Simple semantic linting**
-
-DOG relies on minimal validation: resolving cross-references, checking allowed sections, and detecting name mismatches. Deeper logical constraints are intentionally left to authors and AI reasoning.
-
----
-
-## **3. Primitive Types and Allowed Structure**
-
-Each file must start with a level-one Markdown heading:
-
-```
-# Project: <Name>
-# Actor: <Name>
-# Behavior: <Name>
-# Component: <Name>
-# Data: <Name>
+```bash
+pip install dog
+# or with uv
+uv add dog
 ```
 
-All other content is optional and expressed using Markdown sections.
-All primitives support a `## Notes` section for short annotations.
+### Basic Usage
+
+```bash
+# Validate your docs
+dog lint docs/
+
+# Format files
+dog format docs/
+
+# Generate project index
+dog index docs/ --name "My Project"
+
+# Search for concepts
+dog search "login" --path docs/
+
+# Get a specific document
+dog get "User" --path docs/
+
+# List all documents
+dog list --path docs/
+```
+
+### Example
+
+See the [docs/](docs/) folder for a complete example of DOG documentation for this project.
 
 ---
 
-## **3.1 Project**
+## What is DOG?
 
-Represents the root document of a documentation set.
-Provides a high-level description and an index of all DOG concepts.
-This file may be generated or updated automatically by tooling.
+`.dog.md` is a Markdown-native specification format. Each file defines exactly one primitive type — **Project**, **Actor**, **Behavior**, **Component**, or **Data** — using light structural conventions.
 
-**Format:**
+DOG serves as:
 
+- **Human-readable system documentation**
+- **A structured knowledge base for LLM agents**
+- **A behavioral reference for AI-assisted testing**
+
+### Primitive Types
+
+| Type          | Purpose                                | Example                    |
+| ------------- | -------------------------------------- | -------------------------- |
+| **Project**   | Root index of a documentation set      | `# Project: MyApp`         |
+| **Actor**     | User or service that initiates actions | `# Actor: User`            |
+| **Behavior**  | System response or state transition    | `# Behavior: Login Flow`   |
+| **Component** | Subsystem or UI element                | `# Component: AuthService` |
+| **Data**      | Domain entity with fields              | `# Data: Credentials`      |
+
+### Cross-References
+
+Use sigils inside backticks to reference other concepts:
+
+| Syntax               | Meaning             |
+| -------------------- | ------------------- |
+| `` `@User` ``        | Actor reference     |
+| `` `!Login` ``       | Behavior reference  |
+| `` `#AuthService` `` | Component reference |
+| `` `&Credentials` `` | Data reference      |
+
+---
+
+## CLI Commands
+
+### `dog lint <path>`
+
+Validate `.dog.md` files for structure and reference errors.
+
+```bash
+dog lint docs/
+dog lint my-behavior.dog.md
 ```
+
+### `dog format <path>`
+
+Format `.dog.md` files (normalize whitespace).
+
+```bash
+dog format docs/
+dog format --check docs/  # Check without modifying
+```
+
+### `dog index <path> --name <name>`
+
+Generate or update a Project index file (`index.dog.md`).
+
+```bash
+dog index docs/ --name "My Project"
+```
+
+### `dog search <query>`
+
+Search documents using fuzzy matching. Returns top-k results sorted by relevance.
+
+```bash
+dog search "login"
+dog search "auth" --type Component
+dog search "user" --limit 5 --output json
+```
+
+| Option           | Description                        |
+| ---------------- | ---------------------------------- |
+| `--path`, `-p`   | Directory to search (default: `.`) |
+| `--type`, `-t`   | Filter by primitive type           |
+| `--limit`, `-l`  | Max results (default: 10)          |
+| `--output`, `-o` | `text` or `json`                   |
+
+### `dog get <name>`
+
+Get a document by name with resolved references.
+
+```bash
+dog get "Login Flow"
+dog get "User" --type Actor
+dog get "AuthService" --output json
+```
+
+| Option           | Description                        |
+| ---------------- | ---------------------------------- |
+| `--path`, `-p`   | Directory to search (default: `.`) |
+| `--type`, `-t`   | Filter by primitive type           |
+| `--output`, `-o` | `text` or `json`                   |
+
+### `dog list`
+
+List all documents.
+
+```bash
+dog list
+dog list --type Behavior
+dog list --output json
+```
+
+| Option           | Description                        |
+| ---------------- | ---------------------------------- |
+| `--path`, `-p`   | Directory to search (default: `.`) |
+| `--type`, `-t`   | Filter by primitive type           |
+| `--output`, `-o` | `text` or `json`                   |
+
+---
+
+## File Format Reference
+
+### Project
+
+```markdown
 # Project: <Name>
 
 ## Description
@@ -98,72 +185,42 @@ This file may be generated or updated automatically by tooling.
 - <data name>
 
 ## Notes
-- <short note>
+- <annotation>
 ```
 
----
+### Actor
 
-## **3.2 Actor**
-
-Represents an initiating or participating entity—human or service.
-
-**Format:**
-
-```
+```markdown
 # Actor: <Name>
 
 ## Description
 <free text>
 
 ## Notes
-- <short note>
+- <annotation>
 ```
 
----
+### Behavior
 
-## **3.3 Behavior**
-
-Describes an expected system response, state transition, or effect.
-Behaviors rely on inline references for Actors, Components, Data, and other Behaviors.
-
-**Inline reference conventions (using sigils inside backticks):**
-
-| Syntax | Meaning |
-| ------ | ------- |
-| `` `@actor` `` | Actor reference |
-| `` `!behavior` `` | Behavior reference |
-| `` `#component` `` | Component reference |
-| `` `&data` `` | Data reference |
-
-The linter validates referenced names and annotated types.
-
-**Format:**
-
-```
+```markdown
 # Behavior: <Name>
 
 ## Condition
-- <prerequisite or context>
+- <prerequisite>
 
 ## Description
-<free text with inline references>
+<free text with `@actor`, `!behavior`, `#component`, `&data` references>
 
 ## Outcome
-- <expected effects or state changes>
+- <expected effect>
 
 ## Notes
-- <short note>
+- <annotation>
 ```
 
----
+### Component
 
-## **3.4 Component**
-
-Represents a subsystem, UI element, or logical unit of the application.
-
-**Format:**
-
-```
+```markdown
 # Component: <Name>
 
 ## Description
@@ -176,75 +233,40 @@ Represents a subsystem, UI element, or logical unit of the application.
 - <event name>
 
 ## Notes
-- <short note>
+- <annotation>
 ```
 
----
+### Data
 
-## **3.5 Data**
-
-Represents application-level domain entities and their fields.
-
-**Format:**
-
-```
+```markdown
 # Data: <Name>
 
 ## Description
 <free text>
 
 ## Fields
-- field_name: <optional note>
+- field_name: <description>
 
 ## Notes
-- <short note>
+- <annotation>
 ```
 
 ---
 
-## **4. Inline Reference Rules**
+## Design Principles
 
-DOG uses sigils inside backticks to annotate referenced concept types:
+**Markdown-native** — No custom DSLs. Files render anywhere without special tooling.
 
-| Syntax | Meaning |
-| ------ | ------- |
-| `` `@Name` `` | Actor reference |
-| `` `!Name` `` | Behavior reference |
-| `` `#Name` `` | Component reference |
-| `` `&Name` `` | Data reference |
+**Light structure, high semantic value** — Predictable headings and cross-references that LLMs can reliably parse.
 
-This approach allows normal Markdown formatting (*italic*, **bold**, `code`) without triggering reference detection.
+**Unified source of truth** — One place for product docs, concept definitions, developer references, and AI context.
 
-The linter checks:
+**Flat taxonomy** — No hierarchies. Concepts link through explicit naming.
 
-* referenced names exist
-* referenced types match their sigil annotation
-* unknown names produce warnings
+**Simple linting** — Validates references, sections, and naming. Deeper logic left to authors and AI reasoning.
 
 ---
 
-## **5. Section Rules**
+## License
 
-Allowed sections vary by primitive type but always follow Markdown `##` syntax.
-Unrecognized sections produce linter warnings but are not prohibited.
-
-All primitives may include:
-
-```
-## Notes
-- <short annotation>
-```
-
----
-
-## **6. Summary**
-
-`.dog.md` (Documentation Oriented Grammar) provides a minimal, Markdown-compatible structure for defining system concepts across sphaere. It is designed to:
-
-* Facilitate human-readable documentation
-* Serve as a stable knowledge base for LLM agents
-* Provide clear expectations for behavior-driven AI testing
-* Enable lightweight semantic linting without enforcing rigid formalism
-* Scale incrementally as the system grows
-
-DOG maintains a balance between free natural language and predictable structure, ensuring both humans and AI systems can effectively interpret and utilize the specifications.
+MIT
