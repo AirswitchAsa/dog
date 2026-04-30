@@ -8,6 +8,16 @@
 
 Available on [PyPI](https://pypi.org/project/dog-cli/) and as prebuilt binaries on [Releases](https://github.com/AirswitchAsa/dog/releases/latest).
 
+### For coding agents
+
+DOG ships an [Agent Skill](skills/dog/) that teaches coding agents (Claude Code, Cursor, Codex, etc.) how to navigate `.dog.md` specs as the source of truth — query primitives, trace cross-references, and validate changes — instead of guessing from prose. Install once and your agent picks up DOG conventions automatically across projects:
+
+```bash
+npx skills install https://github.com/AirswitchAsa/dog/tree/main/skills/dog
+```
+
+See [Use with coding agents](#use-with-coding-agents) below for details.
+
 ---
 
 ## What is DOG?
@@ -45,6 +55,8 @@ pip install dog-cli      # or: uv add dog-cli
 ```
 
 **Windows:** download `dog-windows-x64.exe` from [Releases](https://github.com/AirswitchAsa/dog/releases/latest) and place it on your PATH.
+
+> macOS note: binaries are unsigned. The `curl | sh` installer above works without prompts, but if you download via browser, run `xattr -d com.apple.quarantine ~/.local/bin/dog` once to clear Gatekeeper, or install via `pip` / `uv` instead.
 
 ---
 
