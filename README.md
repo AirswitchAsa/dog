@@ -13,7 +13,7 @@ Available on [PyPI](https://pypi.org/project/dog-cli/) and as prebuilt binaries 
 DOG ships an [Agent Skill](skills/dog/) that teaches coding agents (Claude Code, Cursor, Codex, etc.) how to navigate `.dog.md` specs as the source of truth — query primitives, trace cross-references, and validate changes — instead of guessing from prose. Install once and your agent picks up DOG conventions automatically across projects:
 
 ```bash
-npx skills install https://github.com/AirswitchAsa/dog/tree/main/skills/dog
+npx skills add https://github.com/AirswitchAsa/dog/tree/main/skills/dog
 ```
 
 See [Use with coding agents](#use-with-coding-agents) below for details.
@@ -84,7 +84,7 @@ dog serve docs/                         # browser viewer with hot-reload
 The recommended way is to install the bundled skill so agents discover DOG automatically:
 
 ```bash
-npx skills install https://github.com/AirswitchAsa/dog/tree/main/skills/dog
+npx skills add https://github.com/AirswitchAsa/dog/tree/main/skills/dog
 ```
 
 The skill ([`skills/dog`](skills/dog/)) teaches agents to use `dog`, falling back to `uvx --from dog-cli dog` if the binary isn't installed.
