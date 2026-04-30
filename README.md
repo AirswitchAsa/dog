@@ -1,503 +1,150 @@
 # DOG
 
-
 <p align="center">
   <img src="dog.png" alt="DOG" width="200">
 </p>
 
+**Documentation Oriented Grammar** — a Markdown-native specification format for system documentation that serves humans and AI agents alike.
 
-**Documentation Oriented Grammar** — A Markdown-native format for system documentation that serves humans and AI agents alike.
-
-Available on: [pypi](https://pypi.org/project/dog-cli/)
-
----
-
-## Quick Start
-
-### Installation
-
-Install the prebuilt binary (macOS / Linux):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/AirswitchAsa/dog/main/scripts/install.sh | sh
-```
-
-The script downloads the latest release asset matching your OS/arch into `~/.local/bin/dog`. Override with `DOG_INSTALL_DIR` or pin a version with `DOG_INSTALL_VERSION=v2026.4.30`.
-
-Or install from PyPI:
-
-```bash
-pip install dog-cli
-# or with uv
-uv add dog-cli
-```
-
-Windows users: download `dog-windows-x64.exe` from the [Releases page](https://github.com/AirswitchAsa/dog/releases/latest) and place it on your PATH.
-
-### Binary Builds (local)
-
-DOG can be compiled into a local standalone executable with Nuitka:
-
-```bash
-uv sync --group dev
-scripts/build-binary.sh
-dist-bin/dog_cli.dist/dog --help
-```
-
-Use onefile mode when you want a single executable artifact:
-
-```bash
-DOG_NUITKA_MODE=onefile scripts/build-binary.sh
-```
-
-Standalone mode writes `dist-bin/dog_cli.dist/dog`. Onefile mode writes a single executable to `dist-bin/dog`. The build script accepts `DOG_BINARY_OUT_DIR` and `DOG_BINARY_NAME` for release automation.
-
-### Releasing
-
-Release binaries are built via the [Release Binaries](.github/workflows/release.yml) GitHub Actions workflow. It runs on tag push (`v*`) or manual `workflow_dispatch` with a tag input, builds onefile binaries on macOS arm64/x64, Linux x64/arm64, and Windows x64 runners, and uploads them as assets named `dog-<os>-<arch>[.exe]` on the matching GitHub Release.
-
-### Basic Usage
-
-```bash
-# Validate your docs
-dog lint docs/
-
-# Format files
-dog format docs/
-
-# Generate project index
-dog index docs/ --name "My Project"
-
-# Search for concepts
-dog search "login" --path docs/
-
-# Get a specific document
-dog get "@User" --path docs/
-
-# List all documents
-dog list --path docs/
-
-# Find what references a primitive
-dog refs "#AuthService" --path docs/
-
-# Generate dependency graph
-dog graph --path docs/ | dot -Tpng -o graph.png
-
-# Export all docs as JSON
-dog export --path docs/ > context.json
-
-# Serve documentation in browser
-dog serve docs/
-```
-
-## Agent Skill
-
-The recommended way to use DOG with coding agents is to install the bundled skill instead of copying DOG instructions into every system prompt:
-
-```bash
-npx skills install https://github.com/AirswitchAsa/dog/tree/main/skills/dog
-```
-
-After installing, restart your agent so it discovers the skill. The skill teaches agents to use the published `dog-cli` package, preferring an existing `dog` executable and falling back to:
-
-```bash
-uvx --from dog-cli dog
-```
-
-The skill lives in [`skills/dog`](skills/dog/) and includes a small bootstrap script plus a concise CLI reference.
-
-## Agent System Prompt Fallback
-
-If your agent does not support skills, use something similar to this in your LLM agent's system prompt to enable DOG-driven development:
-
-~~~markdown
----
-name: dog-developer
-description: >
-  PRIMARY DEVELOPMENT AGENT for this codebase. Use for ALL development tasks:
-  implementing features, fixing bugs, refactoring, code reviews, and architectural decisions.
-
-  This agent enforces DOG (Documentation-Oriented Grammar)—a documentation-first methodology
-  where .dog.md behavioral specifications are the source of truth. Code fulfills documentation,
-  not the other way around.
-model: opus
----
-
-You are the primary development agent for this codebase, combining expert software engineering with DOG methodology.
-
-## Documentation Structure
-
-```
-docs/
-├── *.md              # Prose docs
-├── index.dog.md      # DOG index (auto-generated)
-├── actors/           # @Actor specs
-├── behaviors/        # !Behavior specs
-├── components/       # #Component specs
-└── data/             # &Data specs
-```
-
-## DOG Primitives
-
-| Sigil | Type      | Purpose               | Required Sections                      |
-| ----- | --------- | --------------------- | -------------------------------------- |
-| `@`   | Actor     | Who initiates actions | Description, Notes                     |
-| `!`   | Behavior  | What the system does  | Condition, Description, Outcome, Notes |
-| `#`   | Component | How it's built        | Description, State, Events, Notes      |
-| `&`   | Data      | What's stored         | Description, Fields, Notes             |
-
-## CLI Reference
-
-| Command  | Usage                                  | Purpose                                   |
-| -------- | -------------------------------------- | ----------------------------------------- |
-| `get`    | `uv run dog get <name> -p docs`        | Read a primitive with resolved refs       |
-| `search` | `uv run dog search <query> -p docs`    | Find primitives with hybrid local search  |
-| `list`   | `uv run dog list [sigil] -p docs`      | List all primitives (filter: `@!#&`)      |
-| `refs`   | `uv run dog refs <name> -p docs`       | **Reverse lookup**: what references this? |
-| `export` | `uv run dog export -p docs`            | Bulk export all docs as JSON              |
-| `graph`  | `uv run dog graph [root] -p docs`      | DOT output for dependency visualization   |
-| `lint`   | `uv run dog lint docs`                 | Validate structure/refs (positional path) |
-| `format` | `uv run dog format docs`               | Normalize whitespace (positional path)    |
-
-**Tips:**
-- `get`, `search`, `list`, and `refs` return JSON by default; use `-o text` for human-readable output
-- Use `dog get <name> --depth 1` to include directly referenced primitives
-- Use `dog search <query> --all` or `--min-score 0` to include low-confidence search matches
-- Use sigil prefix to filter: `#WorkspaceStore`, `!SaveChat`, `@User`, `&Folder`
-- `refs` is essential for impact analysis before changes
-
-## Workflow
-
-### Implementation
-1. **Understand**: `dog get` + `dog refs` to see dependencies
-2. **Design**: Document new behaviors before coding
-3. **Implement**: Code fulfills documented behavior
-4. **Validate**: `uv run dog lint docs` passes
-
-### Investigation
-1. **Explore**: `dog search` + `dog refs` to map the concept
-2. **Verify**: Check consistency across all mentions
-3. **Fix**: Update docs OR code (whichever is wrong)
-
-### Decision Guide
-- **Bug in code** → Fix code to match spec
-- **Bug in spec** → Fix spec, then code
-- **Missing docs** → Document first, ask if unclear
-- **Cross-cutting change** → Use `dog refs` to find all affected docs
-
-## Quality Gate
-
-Before completing any task:
-- [ ] `uv run dog lint docs` passes
-- [ ] Code matches documented Behaviors
-- [ ] Terminology consistent (use `dog refs` to verify)
-
-You advocate for documentation-first development. If specs are unclear, clarify or document before implementing.
-~~~
-
----
-
-
-### Example
-
-See the [docs/](docs/) folder for a complete example of DOG documentation for this project.
+Available on [PyPI](https://pypi.org/project/dog-cli/) and as prebuilt binaries on [Releases](https://github.com/AirswitchAsa/dog/releases/latest).
 
 ---
 
 ## What is DOG?
 
-`.dog.md` is a Markdown-native specification format. Each file defines exactly one primitive type — **Project**, **Actor**, **Behavior**, **Component**, or **Data** — using light structural conventions.
+`.dog.md` files define exactly one **primitive** per file using light Markdown conventions. Cross-references use sigils inside backticks.
 
-DOG serves as:
+| Sigil | Primitive | Purpose                | Required sections                      |
+| ----- | --------- | ---------------------- | -------------------------------------- |
+| `@`   | Actor     | Who initiates actions  | Description, Notes                     |
+| `!`   | Behavior  | What the system does   | Condition, Description, Outcome, Notes |
+| `#`   | Component | How it's built         | Description, State, Events, Notes      |
+| `&`   | Data      | What's stored          | Description, Fields, Notes             |
+|       | Project   | Root index of a docset | Description, Actors, Behaviors, Components, Data, Notes |
 
-- **Human-readable system documentation**
-- **A structured knowledge base for LLM agents**
-- **A behavioral reference for AI-assisted testing**
+Reference syntax: `` `@User` ``, `` `!Login` ``, `` `#AuthService` ``, `` `&Credentials` ``.
 
-### Primitive Types
-
-| Type          | Purpose                                | Example                    |
-| ------------- | -------------------------------------- | -------------------------- |
-| **Project**   | Root index of a documentation set      | `# Project: MyApp`         |
-| **Actor**     | User or service that initiates actions | `# Actor: User`            |
-| **Behavior**  | System response or state transition    | `# Behavior: Login Flow`   |
-| **Component** | Subsystem or UI element                | `# Component: AuthService` |
-| **Data**      | Domain entity with fields              | `# Data: Credentials`      |
-
-### Cross-References
-
-Use sigils inside backticks to reference other concepts:
-
-| Syntax               | Meaning             |
-| -------------------- | ------------------- |
-| `` `@User` ``        | Actor reference     |
-| `` `!Login` ``       | Behavior reference  |
-| `` `#AuthService` `` | Component reference |
-| `` `&Credentials` `` | Data reference      |
+See [docs/](docs/) for a full example, and [skills/dog/references/cli.md](skills/dog/references/cli.md) for the CLI reference.
 
 ---
 
-## CLI Commands
+## Install
 
-### `dog lint <path>`
-
-Validate `.dog.md` files for structure and reference errors.
+**Prebuilt binary (macOS / Linux):**
 
 ```bash
-dog lint docs/
-dog lint my-behavior.dog.md
+curl -fsSL https://raw.githubusercontent.com/AirswitchAsa/dog/main/scripts/install.sh | sh
 ```
 
-### `dog format <path>`
+Drops `dog` into `~/.local/bin`. Override with `DOG_INSTALL_DIR`, pin with `DOG_INSTALL_VERSION=v2026.4.30`.
 
-Format `.dog.md` files (normalize whitespace).
+**PyPI:**
 
 ```bash
-dog format docs/
-dog format --check docs/  # Check without modifying
+pip install dog-cli      # or: uv add dog-cli
 ```
 
-### `dog index <path> --name <name>`
-
-Generate or update a Project index file (`index.dog.md`).
-
-```bash
-dog index docs/ --name "My Project"
-```
-
-### `dog search <query>`
-
-Search documents using local hybrid retrieval. Returns JSON by default with results sorted by relevance.
-
-```bash
-dog search "login"
-dog search "#auth"              # Filter by Component type
-dog search "user" --limit 5
-dog search "anything" --all --output text
-```
-
-| Option           | Description                        |
-| ---------------- | ---------------------------------- |
-| `--path`, `-p`   | Directory to search (default: `.`) |
-| `--limit`, `-l`  | Max results (default: 10)          |
-| `--output`, `-o` | `json` or `text`                   |
-| `--min-score`    | Minimum relevance score            |
-| `--all`          | Include low-confidence matches     |
-
-Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
-
-### `dog get <name>`
-
-Get a document by name with resolved references.
-
-```bash
-dog get "Login Flow"
-dog get "@User"                 # Get Actor named User
-dog get "#AuthService"
-dog get "!Login" --depth 1
-```
-
-| Option           | Description                        |
-| ---------------- | ---------------------------------- |
-| `--path`, `-p`   | Directory to search (default: `.`) |
-| `--output`, `-o` | `json` or `text`                   |
-| `--depth`        | Expand referenced docs N hops      |
-
-Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
-
-### `dog list`
-
-List all documents.
-
-```bash
-dog list
-dog list !                      # List only Behaviors
-dog list --output json
-```
-
-| Option           | Description                        |
-| ---------------- | ---------------------------------- |
-| `--path`, `-p`   | Directory to search (default: `.`) |
-| `--output`, `-o` | `json` or `text`                   |
-
-Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
-
-### `dog refs <name>`
-
-Find all documents that reference a given primitive (reverse lookup).
-
-```bash
-dog refs "#AuthService"         # What references AuthService?
-dog refs "@User" --output json  # JSON output
-```
-
-| Option           | Description                        |
-| ---------------- | ---------------------------------- |
-| `--path`, `-p`   | Directory to search (default: `.`) |
-| `--output`, `-o` | `json` or `text`                   |
-
-Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
-
-### `dog graph [root]`
-
-Generate a DOT format dependency graph for visualization.
-
-```bash
-dog graph                              # Full graph
-dog graph "!Login"                     # Subgraph from Login behavior
-dog graph -p docs/ | dot -Tpng -o graph.png  # Render with graphviz
-```
-
-| Option         | Description                        |
-| -------------- | ---------------------------------- |
-| `--path`, `-p` | Directory to search (default: `.`) |
-
-Output is DOT format, pipe to graphviz (`dot`, `neato`, etc.) for rendering.
-
-### `dog export`
-
-Export all DOG documents as JSON for AI agent consumption.
-
-```bash
-dog export -p docs/                    # Export all docs
-dog export -t ! -p docs/               # Export only Behaviors
-dog export --no-raw -p docs/           # Exclude raw markdown
-```
-
-| Option         | Description                                        |
-| -------------- | -------------------------------------------------- |
-| `--path`, `-p` | Directory to search (default: `.`)                 |
-| `--type`, `-t` | Type filter: `@` (Actor), `!` (Behavior), `#`, `&` |
-| `--no-raw`     | Exclude raw markdown content from output           |
-
-### `dog serve <path>`
-
-Serve DOG documentation as HTML in the browser with hot-reload.
-
-```bash
-dog serve docs/
-dog serve --host 0.0.0.0 --port 3000
-dog serve docs/ --no-reload
-```
-
-| Option         | Description                         |
-| -------------- | ----------------------------------- |
-| `--host`, `-h` | Host to bind (default: `127.0.0.1`) |
-| `--port`, `-P` | Port to bind (default: `8000`)      |
-| `--no-reload`  | Disable hot-reload on file changes  |
-
-Features:
-- Color-coded reference links (red=Actor, blue=Behavior, purple=Component, green=Data)
-- Renders `index.dog.md` as homepage when present
-- Automatic favicon discovery (favicon.png or dog.png)
-- Hot-reload on file changes
+**Windows:** download `dog-windows-x64.exe` from [Releases](https://github.com/AirswitchAsa/dog/releases/latest) and place it on your PATH.
 
 ---
 
-## File Format Reference
+## Usage
 
-### Project
-
-```markdown
-# Project: <Name>
-
-## Description
-<freeform text>
-
-## Actors
-- <actor name>
-
-## Behaviors
-- <behavior name>
-
-## Components
-- <component name>
-
-## Data
-- <data name>
-
-## Notes
-- <annotation>
+```bash
+dog lint docs/                          # validate structure & refs
+dog format docs/                        # normalize whitespace (--check to dry-run)
+dog index docs/ --name "My Project"     # generate index.dog.md
+dog search "login" -p docs/             # hybrid local search
+dog get "@User" -p docs/ --depth 1      # read with resolved refs
+dog list -p docs/                       # list all primitives
+dog refs "#AuthService" -p docs/        # reverse lookup
+dog graph -p docs/ | dot -Tpng -o g.png # dependency graph
+dog export -p docs/ > context.json      # bulk JSON export
+dog serve docs/                         # browser viewer with hot-reload
 ```
 
-### Actor
+`search`, `get`, `list`, and `refs` return JSON by default. Use `-o text` for human output. Run `dog <command> --help` for full options.
 
-```markdown
-# Actor: <Name>
+---
 
-## Description
-<free text>
+## Use with coding agents
 
-## Notes
-- <annotation>
+The recommended way is to install the bundled skill so agents discover DOG automatically:
+
+```bash
+npx skills install https://github.com/AirswitchAsa/dog/tree/main/skills/dog
 ```
 
-### Behavior
+The skill ([`skills/dog`](skills/dog/)) teaches agents to use `dog`, falling back to `uvx --from dog-cli dog` if the binary isn't installed.
 
-```markdown
-# Behavior: <Name>
+<details>
+<summary>System-prompt fallback (for agents without skill support)</summary>
 
-## Condition
-- <prerequisite>
+~~~markdown
+You are the primary development agent for this codebase, combining expert software engineering with DOG methodology.
 
-## Description
-<free text with `@actor`, `!behavior`, `#component`, `&data` references>
+## CLI Reference
 
-## Outcome
-- <expected effect>
+| Command  | Purpose                                   |
+| -------- | ----------------------------------------- |
+| `get`    | Read a primitive with resolved refs       |
+| `search` | Find primitives with hybrid local search  |
+| `list`   | List all primitives (filter: `@!#&`)      |
+| `refs`   | Reverse lookup: what references this?     |
+| `export` | Bulk export all docs as JSON              |
+| `graph`  | DOT output for dependency visualization   |
+| `lint`   | Validate structure/refs                   |
+| `format` | Normalize whitespace                      |
 
-## Notes
-- <annotation>
+Tips:
+- `get`, `search`, `list`, `refs` return JSON by default; `-o text` for humans
+- `dog get <name> --depth 1` includes directly referenced primitives
+- `dog search <query> --all` includes low-confidence matches
+- Sigil prefixes filter by type: `#`, `!`, `@`, `&`
+- `refs` is essential for impact analysis before changes
+
+## Workflow
+
+1. **Understand**: `dog get` + `dog refs` to map dependencies
+2. **Design**: document new behaviors before coding
+3. **Implement**: code fulfills documented behavior
+4. **Validate**: `dog lint docs` passes
+
+Decision guide:
+- Bug in code → fix code to match spec
+- Bug in spec → fix spec, then code
+- Missing docs → document first
+- Cross-cutting change → use `dog refs` to find affected docs
+
+Quality gate before completing any task: `dog lint docs` passes, code matches documented Behaviors, terminology is consistent.
+~~~
+
+</details>
+
+---
+
+## Build a binary locally
+
+```bash
+uv sync --group dev
+scripts/build-binary.sh                          # standalone (dist-bin/dog_cli.dist/dog)
+DOG_NUITKA_MODE=onefile scripts/build-binary.sh  # single file (dist-bin/dog)
 ```
 
-### Component
-
-```markdown
-# Component: <Name>
-
-## Description
-<free text>
-
-## State
-- <state field>
-
-## Events
-- <event name>
-
-## Notes
-- <annotation>
-```
-
-### Data
-
-```markdown
-# Data: <Name>
-
-## Description
-<free text>
-
-## Fields
-- field_name: <description>
-
-## Notes
-- <annotation>
-```
+Release binaries are produced by the [Release Binaries](.github/workflows/release.yml) workflow on tag push (`v*`) or manual dispatch — matrix-builds onefile binaries for macOS arm64/x64, Linux x64/arm64 (glibc 2.35+), and Windows x64.
 
 ---
 
 ## Why DOG?
 
-| Approach                | Trade-offs                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **RAG/Vector Search**   | Requires embeddings, chunking strategy, retrieval tuning. Context can be fragmented or miss cross-references.            |
-| **Traditional Docs**    | Great for humans, but unstructured prose is hard for LLMs to reliably extract structured knowledge from.                 |
-| **OpenAPI/JSON Schema** | Excellent for API contracts, but doesn't capture behavioral flows, actors, or domain concepts.                           |
-| **DOG**                 | Markdown-native, no infra needed. Structured enough for LLM parsing, readable enough for humans. Single source of truth. |
-
-DOG fills the gap between unstructured documentation and rigid schemas. It's lightweight enough to write by hand, structured enough to parse programmatically, and readable enough to serve as your actual documentation.
+| Approach                | Trade-off                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| RAG / vector search     | Needs embeddings + chunking; context can fragment or miss cross-references.                |
+| Traditional prose docs  | Great for humans, hard for LLMs to extract structured knowledge from.                      |
+| OpenAPI / JSON Schema   | Excellent for API contracts, but doesn't capture flows, actors, or domain concepts.        |
+| **DOG**                 | Markdown-native, no infra. Structured for LLMs, readable for humans. Single source of truth. |
 
 ---
-
 
 ## License
 

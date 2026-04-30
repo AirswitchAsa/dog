@@ -15,7 +15,21 @@ permissions:
   contents: write
 
 jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restrict to repo owner
+        env:
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if [ "$ACTOR" != "$OWNER" ]; then
+            echo "::error::Release workflow is restricted to the repo owner ($OWNER); actor was $ACTOR"
+            exit 1
+          fi
+
   build:
+    needs: authorize
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -29,10 +43,10 @@ jobs:
             runner: macos-13
             ext: ""
           - target: dog-linux-x64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04
             ext: ""
           - target: dog-linux-arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
             ext: ""
           - target: dog-windows-x64
             runner: windows-latest
@@ -75,7 +89,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: build
+    needs: [authorize, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
