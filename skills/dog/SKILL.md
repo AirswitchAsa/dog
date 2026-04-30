@@ -23,7 +23,10 @@ In an installed skill, resolve the script path relative to this `SKILL.md`. If t
 
 1. Existing executable: `dog`
 2. Ephemeral PyPI execution: `uvx --from dog-cli dog`
-3. Ask the user to install: `uv tool install dog-cli` or `pip install dog-cli`
+3. Ask the user to install (in order of preference):
+   - Prebuilt binary (macOS/Linux): `curl -fsSL https://raw.githubusercontent.com/AirswitchAsa/dog/main/scripts/install.sh | sh`
+   - Persistent PyPI install: `uv tool install dog-cli`
+   - Fallback: `pip install dog-cli`
 
 Do not assume plain `uvx dog-cli` works; use `uvx --from dog-cli dog`.
 
