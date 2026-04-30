@@ -16,11 +16,45 @@ Available on: [pypi](https://pypi.org/project/dog-cli/)
 
 ### Installation
 
+Install the prebuilt binary (macOS / Linux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AirswitchAsa/dog/main/scripts/install.sh | sh
+```
+
+The script downloads the latest release asset matching your OS/arch into `~/.local/bin/dog`. Override with `DOG_INSTALL_DIR` or pin a version with `DOG_INSTALL_VERSION=v2026.4.30`.
+
+Or install from PyPI:
+
 ```bash
 pip install dog-cli
 # or with uv
 uv add dog-cli
 ```
+
+Windows users: download `dog-windows-x64.exe` from the [Releases page](https://github.com/AirswitchAsa/dog/releases/latest) and place it on your PATH.
+
+### Binary Builds (local)
+
+DOG can be compiled into a local standalone executable with Nuitka:
+
+```bash
+uv sync --group dev
+scripts/build-binary.sh
+dist-bin/dog_cli.dist/dog --help
+```
+
+Use onefile mode when you want a single executable artifact:
+
+```bash
+DOG_NUITKA_MODE=onefile scripts/build-binary.sh
+```
+
+Standalone mode writes `dist-bin/dog_cli.dist/dog`. Onefile mode writes a single executable to `dist-bin/dog`. The build script accepts `DOG_BINARY_OUT_DIR` and `DOG_BINARY_NAME` for release automation.
+
+### Releasing
+
+Release binaries are built via the [Release Binaries](.github/workflows/release.yml) GitHub Actions workflow. It runs on tag push (`v*`) or manual `workflow_dispatch` with a tag input, builds onefile binaries on macOS arm64/x64, Linux x64/arm64, and Windows x64 runners, and uploads them as assets named `dog-<os>-<arch>[.exe]` on the matching GitHub Release.
 
 ### Basic Usage
 
@@ -56,9 +90,25 @@ dog export --path docs/ > context.json
 dog serve docs/
 ```
 
-## Agent System Prompt
+## Agent Skill
 
-This is an example system prompt (agent definition) in Claude Code. Use something similar to this in your LLM agent's system prompt to enable DOG-driven development:
+The recommended way to use DOG with coding agents is to install the bundled skill instead of copying DOG instructions into every system prompt:
+
+```bash
+npx skills install https://github.com/AirswitchAsa/dog/tree/main/skills/dog
+```
+
+After installing, restart your agent so it discovers the skill. The skill teaches agents to use the published `dog-cli` package, preferring an existing `dog` executable and falling back to:
+
+```bash
+uvx --from dog-cli dog
+```
+
+The skill lives in [`skills/dog`](skills/dog/) and includes a small bootstrap script plus a concise CLI reference.
+
+## Agent System Prompt Fallback
+
+If your agent does not support skills, use something similar to this in your LLM agent's system prompt to enable DOG-driven development:
 
 ~~~markdown
 ---

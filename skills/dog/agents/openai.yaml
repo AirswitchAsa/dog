@@ -1,0 +1,7 @@
+interface:
+  display_name: "DOG"
+  short_description: "Documentation-first development with DOG"
+  default_prompt: "Use $dog to inspect DOG specs, implement matching code, and validate docs."
+
+policy:
+  allow_implicit_invocation: true

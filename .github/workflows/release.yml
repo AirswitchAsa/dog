@@ -1,0 +1,111 @@
+name: Release Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v2026.4.30). Created if it does not exist."
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: dog-darwin-arm64
+            runner: macos-14
+            ext: ""
+          - target: dog-darwin-x64
+            runner: macos-13
+            ext: ""
+          - target: dog-linux-x64
+            runner: ubuntu-latest
+            ext: ""
+          - target: dog-linux-arm64
+            runner: ubuntu-24.04-arm
+            ext: ""
+          - target: dog-windows-x64
+            runner: windows-latest
+            ext: ".exe"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: Sync dependencies
+        run: uv sync --group dev
+
+      - name: Build onefile binary
+        shell: bash
+        env:
+          DOG_NUITKA_MODE: onefile
+          DOG_BINARY_OUT_DIR: dist-bin
+          DOG_BINARY_NAME: dog
+        run: scripts/build-binary.sh
+
+      - name: Smoke test
+        shell: bash
+        run: dist-bin/dog${{ matrix.ext }} --help
+
+      - name: Stage asset
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cp "dist-bin/dog${{ matrix.ext }}" "artifacts/${{ matrix.target }}${{ matrix.ext }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: artifacts/${{ matrix.target }}${{ matrix.ext }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              --target "${GITHUB_SHA}"
+          fi
+          gh release upload "$TAG" artifacts/* --clobber

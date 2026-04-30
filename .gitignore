@@ -9,3 +9,8 @@ __pycache__
 .coverage.*
 htmlcov/
 coverage.xml
+dist/
+dist-bin/
+*.build/
+*.dist/
+*.onefile-build/
