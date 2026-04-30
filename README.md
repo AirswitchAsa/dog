@@ -56,6 +56,8 @@ pip install dog-cli      # or: uv add dog-cli
 
 **Windows:** download `dog-windows-x64.exe` from [Releases](https://github.com/AirswitchAsa/dog/releases/latest) and place it on your PATH.
 
+**Intel macOS:** prebuilt binaries are not published — use `uv tool install dog-cli` or `pip install dog-cli`.
+
 > macOS note: binaries are unsigned. The `curl | sh` installer above works without prompts, but if you download via browser, run `xattr -d com.apple.quarantine ~/.local/bin/dog` once to clear Gatekeeper, or install via `pip` / `uv` instead.
 
 ---
@@ -143,7 +145,7 @@ scripts/build-binary.sh                          # standalone (dist-bin/dog_cli.
 DOG_NUITKA_MODE=onefile scripts/build-binary.sh  # single file (dist-bin/dog)
 ```
 
-Release binaries are produced by the [Release Binaries](.github/workflows/release.yml) workflow on tag push (`v*`) or manual dispatch — matrix-builds onefile binaries for macOS arm64/x64, Linux x64/arm64 (glibc 2.35+), and Windows x64.
+Release binaries are produced by the [Release Binaries](.github/workflows/release.yml) workflow on tag push (`v*`) or manual dispatch — matrix-builds onefile binaries for macOS arm64, Linux x64/arm64 (glibc 2.35+), and Windows x64.
 
 ---
 

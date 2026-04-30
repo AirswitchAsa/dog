@@ -23,6 +23,10 @@ case "$uname_m" in
   *)             err "unsupported arch: $uname_m" ;;
 esac
 
+if [ "$os" = "darwin" ] && [ "$arch" = "x64" ]; then
+  err "Intel macOS binaries are not published. Install via: uv tool install dog-cli  (or: pip install dog-cli)"
+fi
+
 asset="dog-${os}-${arch}"
 
 if [ "$VERSION" = "latest" ]; then
