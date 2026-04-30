@@ -7,7 +7,7 @@
 
 ## Description
 
-The `@User` runs the `dog graph` command. The `#CLI` invokes the graph generator to build a DOT format dependency graph from all `&DogDocument` instances.
+The `@User` runs the `dog graph` command. The `#CLI` builds a `#DogIndex` and invokes the graph generator to build a DOT format dependency graph from indexed references.
 
 Graph generation:
 - Creates nodes for each primitive with type-specific colors

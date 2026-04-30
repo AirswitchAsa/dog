@@ -7,26 +7,30 @@
 
 ## Description
 
-The `@User` runs the `dog search` command with a query string. The `#CLI` invokes `#Searcher` to search through all `&DogDocument` instances using RapidFuzz fuzzy matching. Returns top-k results sorted by relevance score (0-100).
+The `@User` runs the `dog search` command with a query string. The `#CLI` builds a `#DogIndex` and invokes `#Searcher` to search indexed `&DogDocument` instances using hybrid local retrieval. Returns meaningful results sorted by relevance score (0-100).
 
 Matching strategies:
-- Exact name matches (100 score)
-- Token-based matching (handles word reordering)
-- Partial/substring matches
-- Content matching in sections
-- Reference matching (weighted lower)
+- Exact primitive and name matches
+- Exact token/content matches
+- Fuzzy name matches
+- Fuzzy section matches with section-aware weighting
+- Reference matches through the `#DogIndex`
+- Optional graph-aware expansion from high-confidence matches
 
 ## Outcome
 
-- Top-k documents returned sorted by relevance
-- Sorting: exact matches first, then by name distance, then by score
-- Each result includes name, type, file path, score, and snippet
+- JSON results returned by default
+- Text output available with `-o/--output text`
+- Results below the default minimum relevance threshold are excluded
+- Results sorted by exactness, relevance score, and tie-breakers
+- Each result includes name, type, file path, score, snippet, and match metadata
 - Type filtering via sigil prefix
-- Supports text or JSON output formats
 
 ## Notes
 
 - Use sigil prefix to filter by type: @ (Actor), ! (Behavior), # (Component), & (Data)
 - Use `--limit` to set k (default: 10)
-- Use `--output json` for programmatic consumption
-- Powered by RapidFuzz fuzzy string matching
+- Use `--min-score` to override the default relevance threshold
+- Use `--all` or `--min-score 0` to include low-confidence matches
+- Semantic matching is local, stateless, dependency-light, and does not require embeddings or external model calls
+- `dog search` complements exact source search tools such as rg; it is optimized for DOG primitive, section, and reference retrieval

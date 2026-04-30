@@ -122,9 +122,7 @@ class TestParseDocument:
         # Check references were extracted
         ref_names = {r.name for r in doc.references}
         assert "User" in ref_names
-        assert "AuthComponent" in ref_names
-        assert "UserCredentials" in ref_names
-        assert "Dashboard View" in ref_names
+        assert len(ref_names) == 1
 
     @pytest.mark.asyncio
     async def test_parse_invalid_header(self, tmp_path: Path) -> None:

@@ -7,8 +7,9 @@ from typing import Annotated
 import typer
 
 from dog_core import (
+    AmbiguousLookupError,
+    DogIndex,
     ParseError,
-    PatchData,
     PrimitiveType,
     export_documents,
     find_dog_files,
@@ -19,9 +20,7 @@ from dog_core import (
     get_document,
     lint_documents,
     list_documents,
-    parse_documents,
     parse_primitive_query,
-    patch_document,
     search_documents,
 )
 
@@ -38,6 +37,14 @@ app = typer.Typer(
 )
 
 
+def _json_echo(payload: dict) -> None:
+    typer.echo(json.dumps(payload))
+
+
+async def _load_index(path: Path) -> DogIndex:
+    return await DogIndex.from_path(path)
+
+
 @app.command()
 def lint(
     path: Annotated[
@@ -47,25 +54,56 @@ def lint(
             exists=True,
         ),
     ],
+    output: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output format",
+        ),
+    ] = OutputFormat.text,
 ) -> None:
     """Validate .dog.md files for structure and reference errors."""
 
     async def _lint() -> int:
-        files = await find_dog_files(path)
-
-        if not files:
-            typer.echo(f"No .dog.md files found in {path}")
-            return 1
-
-        typer.echo(f"Linting {len(files)} file(s)...")
-
         try:
-            docs = await parse_documents(files)
+            index = await _load_index(path)
         except ParseError as e:
-            typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            if output == OutputFormat.json:
+                _json_echo({"issues": [], "error": str(e)})
+            else:
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
 
-        result = await lint_documents(docs)
+        if not index.documents:
+            if output == OutputFormat.json:
+                _json_echo({"issues": [], "error": "No .dog.md files found"})
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 1
+
+        if output == OutputFormat.text:
+            typer.echo(f"Linting {len(index.documents)} file(s)...")
+
+        result = await lint_documents(index)
+
+        if output == OutputFormat.json:
+            _json_echo(
+                {
+                    "issues": [
+                        {
+                            "file": str(issue.file_path),
+                            "line": issue.line_number,
+                            "message": issue.message,
+                            "severity": issue.severity,
+                        }
+                        for issue in result.issues
+                    ],
+                    "errors": len(result.errors),
+                    "warnings": len(result.warnings),
+                }
+            )
+            return 1 if result.has_errors else 0
 
         # Print issues grouped by file
         for issue in result.issues:
@@ -188,18 +226,16 @@ def index(
             search_path = path
             output_path = path / "index.dog.md"
 
-        files = await find_dog_files(search_path)
-
-        if not files:
-            typer.echo(f"No .dog.md files found in {search_path}")
-
         try:
-            docs = await parse_documents(files)
+            dog_index = await _load_index(search_path)
         except ParseError as e:
             typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
 
-        await generate_index(docs, name, output_path)
+        if not dog_index.documents:
+            typer.echo(f"No .dog.md files found in {search_path}")
+
+        await generate_index(dog_index.documents, name, output_path)
         typer.secho(f"Generated index: {output_path}", fg=typer.colors.GREEN)
         return 0
 
@@ -236,7 +272,21 @@ def search(  # noqa: C901
             "-o",
             help="Output format",
         ),
-    ] = OutputFormat.text,
+    ] = OutputFormat.json,
+    min_score: Annotated[
+        float,
+        typer.Option(
+            "--min-score",
+            help="Minimum relevance score to include",
+        ),
+    ] = 40.0,
+    all_results: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            help="Include low-confidence matches",
+        ),
+    ] = False,
 ) -> None:
     """Search DOG documents by name or content.
 
@@ -251,28 +301,27 @@ def search(  # noqa: C901
         # Parse primitive query for type filter
         actual_query, ptype = parse_primitive_query(query)
 
-        files = await find_dog_files(path)
-
-        if not files:
-            if output == OutputFormat.json:
-                typer.echo(json.dumps({"results": [], "error": "No .dog.md files found"}))
-            else:
-                typer.echo(f"No .dog.md files found in {path}")
-            return 1
-
         try:
-            docs = await parse_documents(files)
+            index = await _load_index(path)
         except ParseError as e:
             if output == OutputFormat.json:
-                typer.echo(json.dumps({"results": [], "error": str(e)}))
+                _json_echo({"results": [], "error": str(e)})
             else:
                 typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
 
-        results = await search_documents(docs, actual_query, type_filter=ptype, limit=limit)
+        if not index.documents:
+            if output == OutputFormat.json:
+                _json_echo({"results": [], "error": "No .dog.md files found"})
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 1
+
+        threshold = 0.0 if all_results else min_score
+        results = await search_documents(index, actual_query, type_filter=ptype, limit=limit, min_score=threshold)
 
         if output == OutputFormat.json:
-            typer.echo(json.dumps({"results": [r.to_dict() for r in results]}))
+            _json_echo({"results": [r.to_dict() for r in results]})
         else:
             if not results:
                 typer.echo(f"No results found for '{query}'")
@@ -311,7 +360,15 @@ def get(  # noqa: C901
             "-o",
             help="Output format",
         ),
-    ] = OutputFormat.text,
+    ] = OutputFormat.json,
+    depth: Annotated[
+        int,
+        typer.Option(
+            "--depth",
+            help="Expand referenced documents up to N hops",
+            min=0,
+        ),
+    ] = 0,
 ) -> None:
     """Get a DOG document by name with resolved references.
 
@@ -328,40 +385,45 @@ def get(  # noqa: C901
 
         if not actual_name:
             if output == OutputFormat.json:
-                typer.echo(json.dumps({"error": "Name is required"}))
+                _json_echo({"error": "Name is required"})
             else:
                 typer.secho("Name is required", fg=typer.colors.RED)
             return 1
 
-        files = await find_dog_files(path)
-
-        if not files:
+        try:
+            index = await _load_index(path)
+        except ParseError as e:
             if output == OutputFormat.json:
-                typer.echo(json.dumps({"error": "No .dog.md files found"}))
+                _json_echo({"error": str(e)})
+            else:
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            return 1
+
+        if not index.documents:
+            if output == OutputFormat.json:
+                _json_echo({"error": "No .dog.md files found"})
             else:
                 typer.echo(f"No .dog.md files found in {path}")
             return 1
 
         try:
-            docs = await parse_documents(files)
-        except ParseError as e:
+            result = await get_document(index, actual_name, type_filter=ptype, depth=depth)
+        except AmbiguousLookupError as e:
             if output == OutputFormat.json:
-                typer.echo(json.dumps({"error": str(e)}))
+                _json_echo({"error": str(e)})
             else:
-                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+                typer.secho(str(e), fg=typer.colors.RED)
             return 1
-
-        result = await get_document(docs, actual_name, type_filter=ptype)
 
         if result is None:
             if output == OutputFormat.json:
-                typer.echo(json.dumps({"error": f"Not found: {name}"}))
+                _json_echo({"error": f"Not found: {name}"})
             else:
                 typer.secho(f"Not found: {name}", fg=typer.colors.RED)
             return 1
 
         if output == OutputFormat.json:
-            typer.echo(json.dumps(result.to_dict()))
+            _json_echo(result.to_dict())
         else:
             typer.echo(result.to_text())
 
@@ -392,7 +454,7 @@ def list_cmd(  # noqa: C901
             "-o",
             help="Output format",
         ),
-    ] = OutputFormat.text,
+    ] = OutputFormat.json,
 ) -> None:
     """List all DOG documents.
 
@@ -411,33 +473,31 @@ def list_cmd(  # noqa: C901
             if ptype is None:
                 # Invalid filter - not a recognized sigil
                 if output == OutputFormat.json:
-                    typer.echo(json.dumps({"documents": [], "error": "Invalid filter. Use @, !, #, or &"}))
+                    _json_echo({"documents": [], "error": "Invalid filter. Use @, !, #, or &"})
                 else:
                     typer.secho("Invalid filter. Use @, !, #, or &", fg=typer.colors.RED)
                 return 1
 
-        files = await find_dog_files(path)
-
-        if not files:
-            if output == OutputFormat.json:
-                typer.echo(json.dumps({"documents": []}))
-            else:
-                typer.echo(f"No .dog.md files found in {path}")
-            return 0
-
         try:
-            docs = await parse_documents(files)
+            index = await _load_index(path)
         except ParseError as e:
             if output == OutputFormat.json:
-                typer.echo(json.dumps({"documents": [], "error": str(e)}))
+                _json_echo({"documents": [], "error": str(e)})
             else:
                 typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
 
-        results = await list_documents(docs, type_filter=ptype)
+        if not index.documents:
+            if output == OutputFormat.json:
+                _json_echo({"documents": []})
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 0
+
+        results = await list_documents(index, type_filter=ptype)
 
         if output == OutputFormat.json:
-            typer.echo(json.dumps({"documents": results}))
+            _json_echo({"documents": results})
         else:
             if not results:
                 typer.echo("No documents found")
@@ -457,87 +517,6 @@ def list_cmd(  # noqa: C901
         return 0
 
     exit_code = asyncio.run(_list())
-    raise typer.Exit(code=exit_code)
-
-
-@app.command()
-def patch(
-    name: Annotated[
-        str,
-        typer.Argument(help="Name of the primitive to patch (use @/!/#/& prefix for type filter)"),
-    ],
-    data: Annotated[
-        str,
-        typer.Option(
-            "--data",
-            "-d",
-            help='JSON patch data, e.g. \'{"sections": {"Description": "New content"}}\'',
-        ),
-    ],
-    path: Annotated[
-        Path,
-        typer.Option(
-            "--path",
-            "-p",
-            help="Path to search in (default: current directory)",
-        ),
-    ] = Path("."),
-) -> None:
-    """Patch a DOG document with JSON data to update specific sections.
-
-    Use primitive marks to filter by type:
-      @name - Actor
-      !name - Behavior
-      #name - Component
-      &name - Data
-
-    Example:
-      dog patch "@User" --data '{"sections": {"Description": "Updated description"}}'
-    """
-
-    async def _patch() -> int:
-        # Parse primitive query for type filter
-        actual_name, ptype = parse_primitive_query(name)
-
-        if not actual_name:
-            typer.secho("Name is required", fg=typer.colors.RED)
-            return 1
-
-        # Parse JSON data
-        try:
-            patch_dict = json.loads(data)
-            patch_data = PatchData(**patch_dict)
-        except json.JSONDecodeError as e:
-            typer.secho(f"Invalid JSON: {e}", fg=typer.colors.RED)
-            return 1
-        except ValueError as e:
-            typer.secho(f"Invalid patch data: {e}", fg=typer.colors.RED)
-            return 1
-
-        files = await find_dog_files(path)
-
-        if not files:
-            typer.echo(f"No .dog.md files found in {path}")
-            return 1
-
-        try:
-            docs = await parse_documents(files)
-        except ParseError as e:
-            typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
-            return 1
-
-        result = await patch_document(docs, actual_name, patch_data, type_filter=ptype)
-
-        if result.success:
-            typer.secho(f"Patched: {result.file_path}", fg=typer.colors.GREEN)
-            if result.updated_sections:
-                typer.echo(f"Updated sections: {', '.join(result.updated_sections)}")
-        else:
-            typer.secho(f"Error: {result.error}", fg=typer.colors.RED)
-
-        return 0 if result.success else 1
-
-    exit_code = asyncio.run(_patch())
     raise typer.Exit(code=exit_code)
 
 
@@ -562,7 +541,7 @@ def refs(
             "-o",
             help="Output format",
         ),
-    ] = OutputFormat.text,
+    ] = OutputFormat.json,
 ) -> None:
     """Find all documents that reference a given primitive (reverse lookup).
 
@@ -577,28 +556,26 @@ def refs(
     """
 
     async def _refs() -> int:
-        files = await find_dog_files(path)
-
-        if not files:
-            if output == OutputFormat.json:
-                typer.echo(json.dumps({"error": "No .dog.md files found"}))
-            else:
-                typer.echo(f"No .dog.md files found in {path}")
-            return 1
-
         try:
-            docs = await parse_documents(files)
+            index = await _load_index(path)
         except ParseError as e:
             if output == OutputFormat.json:
-                typer.echo(json.dumps({"error": str(e)}))
+                _json_echo({"error": str(e)})
             else:
                 typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
             return 1
 
-        result = await find_refs(docs, query)
+        if not index.documents:
+            if output == OutputFormat.json:
+                _json_echo({"error": "No .dog.md files found"})
+            else:
+                typer.echo(f"No .dog.md files found in {path}")
+            return 1
+
+        result = await find_refs(index, query)
 
         if output == OutputFormat.json:
-            typer.echo(json.dumps(result.to_dict()))
+            _json_echo(result.to_dict())
         else:
             typer.echo(result.to_text())
 
@@ -637,19 +614,17 @@ def graph(
     """
 
     async def _graph() -> int:
-        files = await find_dog_files(path)
-
-        if not files:
-            typer.echo(f"No .dog.md files found in {path}", err=True)
-            return 1
-
         try:
-            docs = await parse_documents(files)
+            index = await _load_index(path)
         except ParseError as e:
             typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
             return 1
 
-        dot_output = await generate_graph(docs, root=root)
+        if not index.documents:
+            typer.echo(f"No .dog.md files found in {path}", err=True)
+            return 1
+
+        dot_output = await generate_graph(index, root=root)
         typer.echo(dot_output)
 
         return 0
@@ -703,20 +678,18 @@ def export_cmd(
                 typer.secho("Invalid filter. Use @, !, #, or &", fg=typer.colors.RED, err=True)
                 return 1
 
-        files = await find_dog_files(path)
-
-        if not files:
-            typer.echo(json.dumps({"documents": [], "error": "No .dog.md files found"}))
-            return 1
-
         try:
-            docs = await parse_documents(files)
+            index = await _load_index(path)
         except ParseError as e:
-            typer.echo(json.dumps({"documents": [], "error": str(e)}))
+            _json_echo({"documents": [], "error": str(e)})
             return 1
 
-        results = await export_documents(docs, type_filter=ptype, include_raw=not no_raw)
-        typer.echo(json.dumps({"documents": results, "count": len(results)}))
+        if not index.documents:
+            _json_echo({"documents": [], "error": "No .dog.md files found"})
+            return 1
+
+        results = await export_documents(index, type_filter=ptype, include_raw=not no_raw)
+        _json_echo({"documents": results, "count": len(results)})
 
         return 0
 

@@ -1,8 +1,9 @@
+from dog_core.dog_index import DogIndex, ensure_index
 from dog_core.models import DogDocument, PrimitiveType
 
 
 async def export_documents(
-    docs: list[DogDocument],
+    index_or_docs: DogIndex | list[DogDocument],
     type_filter: PrimitiveType | None = None,
     include_raw: bool = True,
 ) -> list[dict]:
@@ -16,12 +17,10 @@ async def export_documents(
     Returns:
         List of document dictionaries suitable for JSON serialization
     """
+    index = ensure_index(index_or_docs)
     results: list[dict] = []
 
-    for doc in docs:
-        if type_filter and doc.primitive_type != type_filter:
-            continue
-
+    for doc in index.documents_of_type(type_filter):
         doc_dict: dict = {
             "name": doc.name,
             "type": doc.primitive_type.value,

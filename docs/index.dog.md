@@ -17,7 +17,6 @@ Project index for DOG CLI.
 - [Graph](graph.dog.md)
 - [Lint](lint.dog.md)
 - [List](list.dog.md)
-- [Patch](patch.dog.md)
 - [Refs](refs.dog.md)
 - [Search](search.dog.md)
 - [Serve](serve.dog.md)
@@ -25,12 +24,12 @@ Project index for DOG CLI.
 ## Components
 
 - [CLI](cli.dog.md)
+- [DogIndex](dog-index.dog.md)
 - [Formatter](formatter.dog.md)
 - [Getter](getter.dog.md)
 - [Indexer](indexer.dog.md)
 - [Linter](linter.dog.md)
 - [Parser](parser.dog.md)
-- [Patcher](patcher.dog.md)
 - [Searcher](searcher.dog.md)
 - [Server](server.dog.md)
 
@@ -40,8 +39,6 @@ Project index for DOG CLI.
 - [GetResult](get-result.dog.md)
 - [LintIssue](lint-issue.dog.md)
 - [LintResult](lint-result.dog.md)
-- [PatchData](patch-data.dog.md)
-- [PatchResult](patch-result.dog.md)
 - [ResolvedReference](resolved-reference.dog.md)
 - [SearchResult](search-result.dog.md)
 

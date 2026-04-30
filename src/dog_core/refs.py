@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+from dog_core.dog_index import DogIndex, ensure_index
 from dog_core.models import DogDocument, PrimitiveType, parse_primitive_query
 
 
@@ -59,7 +60,7 @@ class RefsResult(BaseModel):
 
 
 async def find_refs(
-    docs: list[DogDocument],
+    index_or_docs: DogIndex | list[DogDocument],
     query: str,
 ) -> RefsResult:
     """Find all documents that reference a given primitive.
@@ -72,34 +73,25 @@ async def find_refs(
         RefsResult with all referencing documents
     """
     target_name, target_type = parse_primitive_query(query)
-    target_name_lower = target_name.lower()
+    index = ensure_index(index_or_docs)
 
-    referencing_docs: list[RefResult] = []
+    by_source: dict[tuple[PrimitiveType, str], tuple[DogDocument, list[int]]] = {}
+    for occurrence in index.references_to(target_name, target_type):
+        source = occurrence.source
+        key = (source.primitive_type, index.normalize_name(source.name))
+        if key not in by_source:
+            by_source[key] = (source, [])
+        by_source[key][1].append(occurrence.reference.line_number)
 
-    for doc in docs:
-        # Collect references to the target from this document
-        matching_lines: list[int] = []
-
-        for ref in doc.references:
-            # Match by name (case-insensitive)
-            if ref.name.lower() != target_name_lower:
-                continue
-
-            # If type filter specified, must match
-            if target_type and ref.ref_type != target_type:
-                continue
-
-            matching_lines.append(ref.line_number)
-
-        if matching_lines:
-            referencing_docs.append(
-                RefResult(
-                    name=doc.name,
-                    primitive_type=doc.primitive_type,
-                    file_path=str(doc.file_path),
-                    line_numbers=sorted(set(matching_lines)),
-                )
-            )
+    referencing_docs = [
+        RefResult(
+            name=source.name,
+            primitive_type=source.primitive_type,
+            file_path=str(source.file_path),
+            line_numbers=sorted(set(lines)),
+        )
+        for source, lines in by_source.values()
+    ]
 
     # Sort by type then name
     referencing_docs.sort(key=lambda x: (x.primitive_type.value, x.name))

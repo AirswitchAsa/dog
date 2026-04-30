@@ -12,9 +12,11 @@ Represents a single search result with relevance score and contextual snippet.
 - score: relevance score (0-100, higher is better)
 - snippet: contextual text snippet
 - is_exact_match: boolean for exact name match (case-insensitive)
-- name_distance: Levenshtein edit distance from query to name
+- match_reason: primary reason the document matched
+- matched_section: section name that supplied the best content match, if any
 
 ## Notes
 
 - Pydantic BaseModel for validation
 - Implements to_dict() for JSON serialization
+- Returned by `!Search` JSON output by default

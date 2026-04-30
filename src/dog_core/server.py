@@ -9,9 +9,8 @@ import marko
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 
-from dog_core.finder import find_dog_files
+from dog_core.dog_index import AmbiguousLookupError, DogIndex
 from dog_core.models import SIGIL_MAP, DogDocument, PrimitiveType
-from dog_core.parser import parse_documents
 
 
 # Create a GFM-enabled markdown parser for table support
@@ -292,10 +291,12 @@ class DocServer:
     def __init__(self, docs_path: Path) -> None:
         self.docs_path = docs_path.resolve()
         self.favicon_path = self._find_favicon()
+        self.index = DogIndex.from_documents([], root_path=self.docs_path)
         self.docs: list[DogDocument] = []
         self.docs_by_name: dict[str, DogDocument] = {}
         self.markdown_files: list[MarkdownFile] = []
         self.markdown_by_name: dict[str, MarkdownFile] = {}
+        self.loaded = False
         self.app = FastAPI(title="DOG Documentation Server")
         self._setup_routes()
 
@@ -319,13 +320,11 @@ class DocServer:
     async def load_docs(self) -> None:
         """Load or reload all documents from disk."""
         # Load .dog.md files
-        files = await find_dog_files(self.docs_path)
-        if files:
-            self.docs = await parse_documents(files)
-            self.docs_by_name = {doc.name.lower(): doc for doc in self.docs}
-        else:
-            self.docs = []
-            self.docs_by_name = {}
+        self.index = await DogIndex.from_path(self.docs_path)
+        self.docs = self.index.documents
+        self.docs_by_name = {
+            name: docs[0] for name, docs in self.index.by_name.items() if len(docs) == 1
+        }
 
         # Load regular .md files (excluding .dog.md)
         self.markdown_files = []
@@ -335,8 +334,13 @@ class DocServer:
                 md_file = MarkdownFile(md_path, self.docs_path)
                 self.markdown_files.append(md_file)
                 self.markdown_by_name[md_file.name.lower()] = md_file
+        self.loaded = True
 
-    def _setup_routes(self) -> None:
+    async def ensure_loaded(self) -> None:
+        if not self.loaded:
+            await self.load_docs()
+
+    def _setup_routes(self) -> None:  # noqa: C901
         """Set up FastAPI routes."""
 
         @self.app.get("/favicon.png", response_model=None)
@@ -347,7 +351,7 @@ class DocServer:
 
         @self.app.get("/", response_class=HTMLResponse)
         async def index() -> str:
-            await self.load_docs()
+            await self.ensure_loaded()
             # Try to find and render index.dog.md as homepage
             index_doc = self._find_index_doc()
             if index_doc:
@@ -357,8 +361,16 @@ class DocServer:
 
         @self.app.get("/doc/{name:path}", response_class=HTMLResponse, response_model=None)
         async def get_doc(name: str) -> HTMLResponse:
-            await self.load_docs()
-            doc = self.docs_by_name.get(name.lower())
+            await self.ensure_loaded()
+            try:
+                doc = self.index.resolve(name, allow_ambiguous=True)
+            except AmbiguousLookupError:
+                doc = None
+            if doc is None:
+                try:
+                    doc = self.index.resolve_file_stem(name)
+                except AmbiguousLookupError:
+                    doc = None
             if doc is not None:
                 return HTMLResponse(content=self._render_doc(doc))
 
@@ -516,15 +528,13 @@ class DocServer:
             link_text = match.group(2)
             # Get just the filename part (last component)
             filename = path.split("/")[-1]
-            # Find the document by filename
-            # Note: file_path.stem is "name.dog", so we need to strip ".dog"
-            for doc in self.docs:
-                doc_stem = doc.file_path.stem
-                if doc_stem.endswith(".dog"):
-                    doc_stem = doc_stem[:-4]
-                if doc_stem == filename:
-                    ref_class = f"ref-{doc.primitive_type.value.lower()}"
-                    return f'<a href="/doc/{doc.name}" class="{ref_class}">{link_text}</a>'
+            try:
+                doc = self.index.resolve_file_stem(filename)
+            except AmbiguousLookupError:
+                doc = None
+            if doc is not None:
+                ref_class = f"ref-{doc.primitive_type.value.lower()}"
+                return f'<a href="/doc/{doc.name}" class="{ref_class}">{link_text}</a>'
             # Fallback: use filename as-is, no color class
             return f'<a href="/doc/{filename}">{link_text}</a>'
 
@@ -555,18 +565,21 @@ class DocServer:
             # Match <code>@Name</code> or <code>&amp;Name</code> pattern
             pattern = rf"<code>({re.escape(sigil)})([^<]+)</code>"
 
-            def make_replace_ref(css_class: str) -> Callable[[re.Match[str]], str]:
+            def make_replace_ref(
+                css_class: str,
+                primitive_type: PrimitiveType,
+            ) -> Callable[[re.Match[str]], str]:
                 def replace_ref(match: re.Match[str]) -> str:
                     name = match.group(2)
                     # Check if document exists
-                    if name.lower() in self.docs_by_name:
+                    if self.index.resolve(name, primitive_type, allow_ambiguous=True) is not None:
                         return f'<a href="/doc/{name}" class="{css_class}">{name}</a>'
                     # Document doesn't exist - still show colored but no link
                     return f'<span class="{css_class}">{name}</span>'
 
                 return replace_ref
 
-            html = re.sub(pattern, make_replace_ref(ref_class), html)
+            html = re.sub(pattern, make_replace_ref(ref_class, ptype), html)
 
         return html
 

@@ -27,8 +27,7 @@ def sample_behavior() -> str:
 
 ## Description
 
-The `@User` submits credentials to `#AuthComponent` which validates against `&UserCredentials` data.
-On success, `!Dashboard View` is triggered.
+The `@User` submits valid credentials.
 
 ## Outcome
 

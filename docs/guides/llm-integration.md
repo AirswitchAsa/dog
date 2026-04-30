@@ -22,17 +22,17 @@ Use the `dog get` command to retrieve structured context:
 
 ```bash
 # Get a specific document with resolved references
-dog get "@User" --output json
+dog get "@User"
 
 # Search for relevant concepts
-dog search "authentication" --output json --limit 5
+dog search "authentication" --limit 5
 ```
 
 ## Example Workflow
 
 1. User asks about login functionality
-2. Search DOG docs: `dog search "!login" --output json`
-3. Get the behavior: `dog get "!Login" --output json`
+2. Search DOG docs: `dog search "!login"`
+3. Get the behavior: `dog get "!Login"`
 4. Feed structured context to LLM with resolved references
 
 ## JSON Output Format
@@ -45,12 +45,17 @@ The JSON output includes:
 
 This gives LLMs complete context about a concept and its relationships.
 
-## Updating Docs Programmatically
+## Reference Discipline
 
-LLMs can update docs using the patch command:
+DOG references are typed. Only use a sigil when the referenced primitive exists with that exact type:
+
+- Use `@Name` only for Actor primitives
+- Use `!Name` only for Behavior primitives
+- Use `#Name` only for Component primitives
+- Use `&Name` only for Data primitives
+
+Missing primitives and mistyped references are lint errors. Before completing documentation changes, run:
 
 ```bash
-dog patch "@User" --data '{"sections": {"Description": "Updated by AI"}}'
+dog lint docs
 ```
-
-This enables AI-assisted documentation maintenance.

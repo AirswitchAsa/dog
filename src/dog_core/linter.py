@@ -1,5 +1,4 @@
-from pathlib import Path
-
+from dog_core.dog_index import DogIndex, ensure_index
 from dog_core.models import (
     ALLOWED_SECTIONS,
     DogDocument,
@@ -9,7 +8,16 @@ from dog_core.models import (
 )
 
 
-async def lint_documents(docs: list[DogDocument]) -> LintResult:  # noqa: C901
+REQUIRED_SECTIONS: dict[PrimitiveType, set[str]] = {
+    PrimitiveType.PROJECT: {"Description", "Actors", "Behaviors", "Components", "Data", "Notes"},
+    PrimitiveType.ACTOR: {"Description", "Notes"},
+    PrimitiveType.BEHAVIOR: {"Condition", "Description", "Outcome", "Notes"},
+    PrimitiveType.COMPONENT: {"Description", "State", "Events", "Notes"},
+    PrimitiveType.DATA: {"Description", "Fields", "Notes"},
+}
+
+
+async def lint_documents(index_or_docs: DogIndex | list[DogDocument]) -> LintResult:  # noqa: C901
     """Lint a collection of DOG documents.
 
     Validates:
@@ -24,40 +32,64 @@ async def lint_documents(docs: list[DogDocument]) -> LintResult:  # noqa: C901
     Returns:
         LintResult containing all issues found
     """
+    index = ensure_index(index_or_docs)
     issues: list[LintIssue] = []
 
-    # Build index of all known primitives
-    primitives: dict[PrimitiveType, set[str]] = {ptype: set() for ptype in PrimitiveType}
-
-    # Track file names to detect duplicates
-    file_names: dict[str, list[str]] = {}  # name -> list of file paths
-
-    for doc in docs:
-        primitives[doc.primitive_type].add(doc.name)
-        # Track by file stem (e.g., "user" from "user.dog.md")
-        stem = doc.file_path.stem.removesuffix(".dog")
-        if stem not in file_names:
-            file_names[stem] = []
-        file_names[stem].append(str(doc.file_path))
-
     # Check for duplicate file names
-    for name, paths in file_names.items():
-        if len(paths) > 1:
-            for path in paths:
+    for stem, docs in index.ambiguous_file_stems():
+        for doc in docs:
+            issues.append(
+                LintIssue(
+                    file_path=doc.file_path,
+                    line_number=1,
+                    message=f"Duplicate file name '{stem}.dog.md' also exists at: "
+                    f"{', '.join(str(other.file_path) for other in docs if other.file_path != doc.file_path)}",
+                    severity="warning",
+                )
+            )
+
+    # Check for duplicate or cross-type names that make untyped lookup ambiguous.
+    for normalized_name, docs in index.ambiguous_names():
+        labels = ", ".join(f"{doc.primitive_type.value}: {doc.name} ({doc.file_path})" for doc in docs)
+        for doc in docs:
+            issues.append(
+                LintIssue(
+                    file_path=doc.file_path,
+                    line_number=1,
+                    message=f"Ambiguous primitive name '{normalized_name}': {labels}",
+                    severity="error",
+                )
+            )
+
+    # Validate each document
+    for doc in index.documents:
+        # Check sections
+        allowed = ALLOWED_SECTIONS[doc.primitive_type]
+        required = REQUIRED_SECTIONS[doc.primitive_type]
+        sections_by_name = {section.name: section for section in doc.sections}
+
+        for section_name in sorted(required - sections_by_name.keys()):
+            issues.append(
+                LintIssue(
+                    file_path=doc.file_path,
+                    line_number=1,
+                    message=f"Missing required section '{section_name}' for {doc.primitive_type.value}",
+                    severity="error",
+                )
+            )
+
+        for section_name in sorted(required & sections_by_name.keys()):
+            section = sections_by_name[section_name]
+            if not section.content.strip():
                 issues.append(
                     LintIssue(
-                        file_path=Path(path),
-                        line_number=1,
-                        message=f"Duplicate file name '{name}.dog.md' also exists at: "
-                        f"{', '.join(p for p in paths if p != path)}",
-                        severity="warning",
+                        file_path=doc.file_path,
+                        line_number=section.line_number,
+                        message=f"Required section '{section_name}' for {doc.primitive_type.value} is empty",
+                        severity="error",
                     )
                 )
 
-    # Validate each document
-    for doc in docs:
-        # Check sections
-        allowed = ALLOWED_SECTIONS[doc.primitive_type]
         for section in doc.sections:
             if section.name not in allowed:
                 issues.append(
@@ -72,12 +104,12 @@ async def lint_documents(docs: list[DogDocument]) -> LintResult:  # noqa: C901
 
         # Check inline references
         for ref in doc.references:
-            if ref.name not in primitives[ref.ref_type]:
+            if index.resolve_reference(ref) is None:
                 # Check if the name exists as a different type
                 found_type = None
-                for ptype, names in primitives.items():
-                    if ref.name in names:
-                        found_type = ptype
+                for candidate in index.by_name.get(index.normalize_name(ref.name), []):
+                    if candidate.primitive_type != ref.ref_type:
+                        found_type = candidate.primitive_type
                         break
 
                 if found_type is not None:
@@ -96,7 +128,7 @@ async def lint_documents(docs: list[DogDocument]) -> LintResult:  # noqa: C901
                             file_path=doc.file_path,
                             line_number=ref.line_number,
                             message=f"Unknown {ref.ref_type.value} reference: '{ref.name}'",
-                            severity="warning",
+                            severity="error",
                         )
                     )
 

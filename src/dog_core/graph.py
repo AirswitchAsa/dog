@@ -1,3 +1,4 @@
+from dog_core.dog_index import AmbiguousLookupError, DogIndex, ensure_index
 from dog_core.models import DogDocument, PrimitiveType, parse_primitive_query
 
 
@@ -26,7 +27,7 @@ def _escape_dot_id(name: str, ptype: PrimitiveType) -> str:
 
 
 async def generate_graph(  # noqa: C901
-    docs: list[DogDocument],
+    index_or_docs: DogIndex | list[DogDocument],
     root: str | None = None,
 ) -> str:
     """Generate a DOT format dependency graph.
@@ -38,61 +39,48 @@ async def generate_graph(  # noqa: C901
     Returns:
         DOT format graph string
     """
-    # Build index
-    doc_index: dict[tuple[PrimitiveType, str], DogDocument] = {}
-    for doc in docs:
-        doc_index[(doc.primitive_type, doc.name.lower())] = doc
+    index = ensure_index(index_or_docs)
 
     # If root specified, find it and only include connected nodes
     included_docs: list[DogDocument]
     if root:
         root_name, root_type = parse_primitive_query(root)
-        root_name_lower = root_name.lower()
 
         # Find the root document
-        root_doc: DogDocument | None = None
-        for doc in docs:
-            name_matches = doc.name.lower() == root_name_lower
-            type_matches = root_type is None or doc.primitive_type == root_type
-            if name_matches and type_matches:
-                root_doc = doc
-                break
+        try:
+            root_doc = index.resolve(root_name, root_type)
+        except AmbiguousLookupError:
+            return f'digraph DOG {{\n  label="Ambiguous: {root}";\n}}\n'
 
         if root_doc is None:
             return f'digraph DOG {{\n  label="Not found: {root}";\n}}\n'
 
         # BFS to find all connected nodes
-        visited: set[tuple[PrimitiveType, str]] = set()
+        visited = set()
         queue: list[DogDocument] = [root_doc]
         included_docs = []
 
         while queue:
             doc = queue.pop(0)
-            key = (doc.primitive_type, doc.name.lower())
+            key = index.key_for(doc)
             if key in visited:
                 continue
             visited.add(key)
             included_docs.append(doc)
 
             # Add referenced docs to queue
-            for ref in doc.references:
-                ref_key = (ref.ref_type, ref.name.lower())
-                if ref_key not in visited and ref_key in doc_index:
-                    queue.append(doc_index[ref_key])
+            for occurrence in index.references_from(doc):
+                ref_doc = occurrence.target
+                if ref_doc is not None and index.key_for(ref_doc) not in visited:
+                    queue.append(ref_doc)
 
             # Add docs that reference this one (reverse refs)
-            for other_doc in docs:
-                other_key = (other_doc.primitive_type, other_doc.name.lower())
-                if other_key in visited:
-                    continue
-                for ref in other_doc.references:
-                    name_matches = ref.name.lower() == doc.name.lower()
-                    type_matches = root_type is None or ref.ref_type == doc.primitive_type
-                    if name_matches and type_matches:
-                        queue.append(other_doc)
-                        break
+            for occurrence in index.references_to(doc.name, doc.primitive_type):
+                other_doc = occurrence.source
+                if index.key_for(other_doc) not in visited:
+                    queue.append(other_doc)
     else:
-        included_docs = list(docs)
+        included_docs = list(index.documents)
 
     # Generate DOT
     lines = [
@@ -124,15 +112,13 @@ async def generate_graph(  # noqa: C901
         from_id = _escape_dot_id(doc.name, doc.primitive_type)
         for ref in doc.references:
             # Only add edge if target is in included docs
-            ref_key = (ref.ref_type, ref.name.lower())
-            if ref_key in doc_index:
-                target_doc = doc_index[ref_key]
-                if target_doc in included_docs:
-                    to_id = _escape_dot_id(ref.name, ref.ref_type)
-                    edge = (from_id, to_id)
-                    if edge not in edges_added:
-                        edges_added.add(edge)
-                        lines.append(f"  {from_id} -> {to_id};")
+            target_doc = index.resolve_reference(ref)
+            if target_doc is not None and target_doc in included_docs:
+                to_id = _escape_dot_id(ref.name, ref.ref_type)
+                edge = (from_id, to_id)
+                if edge not in edges_added:
+                    edges_added.add(edge)
+                    lines.append(f"  {from_id} -> {to_id};")
 
     lines.append("}")
 

@@ -98,19 +98,21 @@ docs/
 
 ## CLI Reference
 
-| Command  | Usage                                       | Purpose                                   |
-| -------- | ------------------------------------------- | ----------------------------------------- |
-| `get`    | `uv run dog get <name> -p docs -o json`     | Read a primitive with resolved refs       |
-| `search` | `uv run dog search <query> -p docs -o json` | Find primitives by fuzz search            |
-| `list`   | `uv run dog list [sigil] -p docs -o json`   | List all primitives (filter: `@!#&`)      |
-| `refs`   | `uv run dog refs <name> -p docs -o json`    | **Reverse lookup**: what references this? |
-| `export` | `uv run dog export -p docs`                 | Bulk export all docs as JSON              |
-| `graph`  | `uv run dog graph [root] -p docs`           | DOT output for dependency visualization   |
-| `lint`   | `uv run dog lint docs`                      | Validate structure/refs (positional path) |
-| `format` | `uv run dog format docs`                    | Normalize whitespace (positional path)    |
+| Command  | Usage                                  | Purpose                                   |
+| -------- | -------------------------------------- | ----------------------------------------- |
+| `get`    | `uv run dog get <name> -p docs`        | Read a primitive with resolved refs       |
+| `search` | `uv run dog search <query> -p docs`    | Find primitives with hybrid local search  |
+| `list`   | `uv run dog list [sigil] -p docs`      | List all primitives (filter: `@!#&`)      |
+| `refs`   | `uv run dog refs <name> -p docs`       | **Reverse lookup**: what references this? |
+| `export` | `uv run dog export -p docs`            | Bulk export all docs as JSON              |
+| `graph`  | `uv run dog graph [root] -p docs`      | DOT output for dependency visualization   |
+| `lint`   | `uv run dog lint docs`                 | Validate structure/refs (positional path) |
+| `format` | `uv run dog format docs`               | Normalize whitespace (positional path)    |
 
 **Tips:**
-- Use `-o json` for structured output on `get`, `search`, `list`, `refs`
+- `get`, `search`, `list`, and `refs` return JSON by default; use `-o text` for human-readable output
+- Use `dog get <name> --depth 1` to include directly referenced primitives
+- Use `dog search <query> --all` or `--min-score 0` to include low-confidence search matches
 - Use sigil prefix to filter: `#WorkspaceStore`, `!SaveChat`, `@User`, `&Folder`
 - `refs` is essential for impact analysis before changes
 
@@ -139,12 +141,6 @@ Before completing any task:
 - [ ] `uv run dog lint docs` passes
 - [ ] Code matches documented Behaviors
 - [ ] Terminology consistent (use `dog refs` to verify)
-
-## Key Concepts
-
-- **Ephemeral = Unsaved**: `folderId: null` means client-only (Zustand)
-- **Folder context**: `internal_summary` improves search relevance
-- **LRU eviction**: Unsaved searches capped at 50
 
 You advocate for documentation-first development. If specs are unclear, clarify or document before implementing.
 ~~~
@@ -221,19 +217,22 @@ dog index docs/ --name "My Project"
 
 ### `dog search <query>`
 
-Search documents using fuzzy matching. Returns top-k results sorted by relevance.
+Search documents using local hybrid retrieval. Returns JSON by default with results sorted by relevance.
 
 ```bash
 dog search "login"
 dog search "#auth"              # Filter by Component type
-dog search "user" --limit 5 --output json
+dog search "user" --limit 5
+dog search "anything" --all --output text
 ```
 
 | Option           | Description                        |
 | ---------------- | ---------------------------------- |
 | `--path`, `-p`   | Directory to search (default: `.`) |
 | `--limit`, `-l`  | Max results (default: 10)          |
-| `--output`, `-o` | `text` or `json`                   |
+| `--output`, `-o` | `json` or `text`                   |
+| `--min-score`    | Minimum relevance score            |
+| `--all`          | Include low-confidence matches     |
 
 Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
 
@@ -244,13 +243,15 @@ Get a document by name with resolved references.
 ```bash
 dog get "Login Flow"
 dog get "@User"                 # Get Actor named User
-dog get "#AuthService" --output json
+dog get "#AuthService"
+dog get "!Login" --depth 1
 ```
 
 | Option           | Description                        |
 | ---------------- | ---------------------------------- |
 | `--path`, `-p`   | Directory to search (default: `.`) |
-| `--output`, `-o` | `text` or `json`                   |
+| `--output`, `-o` | `json` or `text`                   |
+| `--depth`        | Expand referenced docs N hops      |
 
 Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
 
@@ -267,23 +268,9 @@ dog list --output json
 | Option           | Description                        |
 | ---------------- | ---------------------------------- |
 | `--path`, `-p`   | Directory to search (default: `.`) |
-| `--output`, `-o` | `text` or `json`                   |
+| `--output`, `-o` | `json` or `text`                   |
 
 Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
-
-### `dog patch <name>`
-
-Update specific sections of a DOG document programmatically.
-
-```bash
-dog patch "@User" --data '{"sections": {"Description": "Updated description"}}'
-dog patch "Login" --data '{"sections": {"Outcome": "New outcome"}}'
-```
-
-| Option         | Description                        |
-| -------------- | ---------------------------------- |
-| `--path`, `-p` | Directory to search (default: `.`) |
-| `--data`, `-d` | JSON patch data                    |
 
 ### `dog refs <name>`
 
@@ -297,7 +284,7 @@ dog refs "@User" --output json  # JSON output
 | Option           | Description                        |
 | ---------------- | ---------------------------------- |
 | `--path`, `-p`   | Directory to search (default: `.`) |
-| `--output`, `-o` | `text` or `json`                   |
+| `--output`, `-o` | `json` or `text`                   |
 
 Use sigil prefixes to filter by type: `@` (Actor), `!` (Behavior), `#` (Component), `&` (Data).
 

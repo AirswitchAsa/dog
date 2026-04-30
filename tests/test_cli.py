@@ -130,7 +130,7 @@ class TestIndexCommand:
 
 class TestSearchCommand:
     def test_search_text_output(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(app, ["search", "User", "--path", str(tmp_dog_dir)])
+        result = runner.invoke(app, ["search", "User", "--path", str(tmp_dog_dir), "--output", "text"])
         assert result.exit_code == 0
         assert "User" in result.output
         assert "Actor" in result.output
@@ -151,7 +151,7 @@ class TestSearchCommand:
         # Use sigil prefix for type filter
         result = runner.invoke(
             app,
-            ["search", "@User", "--path", str(tmp_dog_dir)],
+            ["search", "@User", "--path", str(tmp_dog_dir), "--output", "text"],
         )
         assert result.exit_code == 0
         assert "User" in result.output
@@ -160,17 +160,18 @@ class TestSearchCommand:
         # Use sigil prefix for type filter
         result = runner.invoke(
             app,
-            ["search", "#User", "--path", str(tmp_dog_dir)],
+            ["search", "#User", "--path", str(tmp_dog_dir), "--output", "text"],
         )
         assert result.exit_code == 0
         assert "No results found" in result.output
 
     def test_search_low_relevance(self, tmp_dog_dir: Path) -> None:
-        # With top-k, we get results sorted by score even for weak queries
         result = runner.invoke(app, ["search", "zzzqqq999notaword", "--path", str(tmp_dog_dir)])
         assert result.exit_code == 0
-        # Results are returned (low scoring, but still returned)
-        assert result.output.strip() != ""
+        import json
+
+        data = json.loads(result.output)
+        assert data["results"] == []
 
     def test_search_no_files(self, tmp_path: Path) -> None:
         result = runner.invoke(app, ["search", "test", "--path", str(tmp_path)])
@@ -191,7 +192,7 @@ class TestSearchCommand:
 
 class TestGetCommand:
     def test_get_text_output(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(app, ["get", "User", "--path", str(tmp_dog_dir)])
+        result = runner.invoke(app, ["get", "User", "--path", str(tmp_dog_dir), "--output", "text"])
         assert result.exit_code == 0
         assert "# Actor: User" in result.output
         assert "Description" in result.output
@@ -256,7 +257,7 @@ class TestGetCommand:
 
 class TestListCommand:
     def test_list_text_output(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(app, ["list", "--path", str(tmp_dog_dir)])
+        result = runner.invoke(app, ["list", "--path", str(tmp_dog_dir), "--output", "text"])
         assert result.exit_code == 0
         assert "Actors" in result.output
         assert "User" in result.output
@@ -276,7 +277,7 @@ class TestListCommand:
         # Use sigil for type filter
         result = runner.invoke(
             app,
-            ["list", "@", "--path", str(tmp_dog_dir)],
+            ["list", "@", "--path", str(tmp_dog_dir), "--output", "text"],
         )
         assert result.exit_code == 0
         assert "User" in result.output
@@ -305,127 +306,14 @@ class TestListCommand:
         # Use sigil for type filter - no Project types exist
         result = runner.invoke(
             app,
-            ["list", "&", "--path", str(tmp_dog_dir)],
+            ["list", "&", "--path", str(tmp_dog_dir), "--output", "text"],
         )
         assert result.exit_code == 0
         assert "No documents found" in result.output
 
     def test_list_all_sigils(self, tmp_dog_dir: Path) -> None:
         # Test behavior sigil
-        result = runner.invoke(app, ["list", "!", "--path", str(tmp_dog_dir)])
+        result = runner.invoke(app, ["list", "!", "--path", str(tmp_dog_dir), "--output", "text"])
         assert result.exit_code == 0
         assert "Login" in result.output
         assert "User" not in result.output
-
-
-class TestPatchCommand:
-    def test_patch_section(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "patch",
-                "User",
-                "--data",
-                '{"sections": {"Description": "Updated description"}}',
-                "--path",
-                str(tmp_dog_dir),
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Patched" in result.output
-        assert "Description" in result.output
-
-        # Verify file was updated
-        user_file = tmp_dog_dir / "user.dog.md"
-        content = user_file.read_text()
-        assert "Updated description" in content
-
-    def test_patch_with_sigil(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "patch",
-                "@User",
-                "--data",
-                '{"sections": {"Notes": "New note"}}',
-                "--path",
-                str(tmp_dog_dir),
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Patched" in result.output
-
-    def test_patch_not_found(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "patch",
-                "NonExistent",
-                "--data",
-                '{"sections": {"Description": "test"}}',
-                "--path",
-                str(tmp_dog_dir),
-            ],
-        )
-        assert result.exit_code == 1
-        assert "not found" in result.output.lower()
-
-    def test_patch_invalid_section(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "patch",
-                "User",
-                "--data",
-                '{"sections": {"InvalidSection": "test"}}',
-                "--path",
-                str(tmp_dog_dir),
-            ],
-        )
-        assert result.exit_code == 1
-        assert "not allowed" in result.output.lower()
-
-    def test_patch_invalid_json(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "patch",
-                "User",
-                "--data",
-                "not valid json",
-                "--path",
-                str(tmp_dog_dir),
-            ],
-        )
-        assert result.exit_code == 1
-        assert "Invalid JSON" in result.output
-
-    def test_patch_empty_name_with_sigil(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "patch",
-                "@",
-                "--data",
-                '{"sections": {"Description": "test"}}',
-                "--path",
-                str(tmp_dog_dir),
-            ],
-        )
-        assert result.exit_code == 1
-        assert "Name is required" in result.output
-
-    def test_patch_empty_sections(self, tmp_dog_dir: Path) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "patch",
-                "User",
-                "--data",
-                "{}",
-                "--path",
-                str(tmp_dog_dir),
-            ],
-        )
-        assert result.exit_code == 1
-        assert "No sections" in result.output

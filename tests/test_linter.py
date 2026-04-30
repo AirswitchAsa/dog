@@ -11,6 +11,15 @@ from dog_core import (
 )
 
 
+REQUIRED_SECTIONS = {
+    PrimitiveType.PROJECT: ["Description", "Actors", "Behaviors", "Components", "Data", "Notes"],
+    PrimitiveType.ACTOR: ["Description", "Notes"],
+    PrimitiveType.BEHAVIOR: ["Condition", "Description", "Outcome", "Notes"],
+    PrimitiveType.COMPONENT: ["Description", "State", "Events", "Notes"],
+    PrimitiveType.DATA: ["Description", "Fields", "Notes"],
+}
+
+
 def make_doc(
     name: str,
     ptype: PrimitiveType,
@@ -23,7 +32,10 @@ def make_doc(
         file_path=file_path or Path(f"/test/{name.lower()}.dog.md"),
         primitive_type=ptype,
         name=name,
-        sections=[Section(name=s, content="content", line_number=i + 2) for i, s in enumerate(sections or [])],
+        sections=[
+            Section(name=s, content="content", line_number=i + 2)
+            for i, s in enumerate(sections if sections is not None else REQUIRED_SECTIONS[ptype])
+        ],
         references=[InlineReference(name=n, ref_type=t, line_number=10) for n, t in (references or [])],
         raw_content=f"# {ptype.value}: {name}\n",
     )
@@ -34,7 +46,7 @@ class TestLintDocuments:
     async def test_valid_documents(self) -> None:
         docs = [
             make_doc("User", PrimitiveType.ACTOR, ["Description", "Notes"]),
-            make_doc("Login", PrimitiveType.BEHAVIOR, ["Condition", "Description"]),
+            make_doc("Login", PrimitiveType.BEHAVIOR, ["Condition", "Description", "Outcome", "Notes"]),
         ]
 
         result = await lint_documents(docs)
@@ -78,9 +90,9 @@ class TestLintDocuments:
         ]
 
         result = await lint_documents(docs)
-        assert len(result.warnings) == 1
-        assert "Unknown" in result.warnings[0].message
-        assert "NonExistent" in result.warnings[0].message
+        assert len(result.errors) == 1
+        assert "Unknown" in result.errors[0].message
+        assert "NonExistent" in result.errors[0].message
 
     @pytest.mark.asyncio
     async def test_wrong_reference_type(self) -> None:

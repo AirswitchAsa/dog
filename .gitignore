@@ -5,3 +5,7 @@ __pycache__
 .cache
 .ruff_cache
 .uv-cache
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml

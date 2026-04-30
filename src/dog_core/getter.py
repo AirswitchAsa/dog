@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from dog_core.dog_index import AmbiguousLookupError, DogIndex, ensure_index
 from dog_core.models import DogDocument, PrimitiveType
 
 
@@ -29,6 +30,7 @@ class GetResult(BaseModel):
     sections: list[dict]
     references: list[ResolvedReference]
     raw_content: str
+    expanded_documents: list[dict] = Field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -38,6 +40,7 @@ class GetResult(BaseModel):
             "sections": self.sections,
             "references": [r.to_dict() for r in self.references],
             "raw": self.raw_content,
+            "expanded_documents": self.expanded_documents,
         }
 
     def to_text(self) -> str:
@@ -63,10 +66,71 @@ class GetResult(BaseModel):
         return "\n".join(lines)
 
 
+def _document_to_dict(doc: DogDocument, index: DogIndex) -> dict:
+    return {
+        "name": doc.name,
+        "type": doc.primitive_type.value,
+        "file": str(doc.file_path),
+        "sections": [{"name": s.name, "content": s.content} for s in doc.sections],
+        "references": [
+            ResolvedReference(
+                name=ref.reference.name,
+                ref_type=ref.reference.ref_type,
+                resolved=ref.target is not None,
+                file_path=str(ref.target.file_path) if ref.target else None,
+            ).to_dict()
+            for ref in index.references_from(doc)
+        ],
+        "raw": doc.raw_content,
+    }
+
+
+def _resolve_references(index: DogIndex, doc: DogDocument) -> list[ResolvedReference]:
+    resolved_refs: list[ResolvedReference] = []
+    for occurrence in index.references_from(doc):
+        resolved_refs.append(
+            ResolvedReference(
+                name=occurrence.reference.name,
+                ref_type=occurrence.reference.ref_type,
+                resolved=occurrence.target is not None,
+                file_path=str(occurrence.target.file_path) if occurrence.target else None,
+            )
+        )
+    return resolved_refs
+
+
+def _expand_referenced_documents(index: DogIndex, target: DogDocument, depth: int) -> list[dict]:
+    if depth <= 0:
+        return []
+
+    expanded: list[dict] = []
+    seen = {index.key_for(target)}
+    queue: list[tuple[DogDocument, int]] = [(target, 0)]
+
+    while queue:
+        doc, current_depth = queue.pop(0)
+        if current_depth >= depth:
+            continue
+
+        for occurrence in index.references_from(doc):
+            ref_doc = occurrence.target
+            if ref_doc is None:
+                continue
+            key = index.key_for(ref_doc)
+            if key in seen:
+                continue
+            seen.add(key)
+            expanded.append(_document_to_dict(ref_doc, index))
+            queue.append((ref_doc, current_depth + 1))
+
+    return expanded
+
+
 async def get_document(
-    docs: list[DogDocument],
+    index_or_docs: DogIndex | list[DogDocument],
     name: str,
     type_filter: PrimitiveType | None = None,
+    depth: int = 0,
 ) -> GetResult | None:
     """Get a document by name with resolved references.
 
@@ -78,57 +142,28 @@ async def get_document(
     Returns:
         GetResult if found, None otherwise
     """
-    # Build index for reference resolution
-    doc_index: dict[tuple[PrimitiveType, str], DogDocument] = {}
-    for doc in docs:
-        doc_index[(doc.primitive_type, doc.name)] = doc
-        # Also index by name only for fuzzy matching
-        doc_index[(doc.primitive_type, doc.name.lower())] = doc
-
-    # Find the target document
-    target: DogDocument | None = None
-    name_lower = name.lower()
-
-    for doc in docs:
-        if type_filter and doc.primitive_type != type_filter:
-            continue
-
-        if doc.name.lower() == name_lower:
-            target = doc
-            break
+    index = ensure_index(index_or_docs)
+    try:
+        target = index.resolve(name, type_filter)
+    except AmbiguousLookupError:
+        raise
 
     if target is None:
         return None
-
-    # Resolve references
-    resolved_refs: list[ResolvedReference] = []
-    for ref in target.references:
-        # Try to find the referenced document
-        ref_doc = doc_index.get((ref.ref_type, ref.name))
-        if ref_doc is None:
-            ref_doc = doc_index.get((ref.ref_type, ref.name.lower()))
-
-        resolved_refs.append(
-            ResolvedReference(
-                name=ref.name,
-                ref_type=ref.ref_type,
-                resolved=ref_doc is not None,
-                file_path=str(ref_doc.file_path) if ref_doc else None,
-            )
-        )
 
     return GetResult(
         name=target.name,
         primitive_type=target.primitive_type,
         file_path=str(target.file_path),
         sections=[{"name": s.name, "content": s.content} for s in target.sections],
-        references=resolved_refs,
+        references=_resolve_references(index, target),
         raw_content=target.raw_content,
+        expanded_documents=_expand_referenced_documents(index, target, depth),
     )
 
 
 async def list_documents(
-    docs: list[DogDocument],
+    index_or_docs: DogIndex | list[DogDocument],
     type_filter: PrimitiveType | None = None,
 ) -> list[dict]:
     """List all documents, optionally filtered by type.
@@ -140,18 +175,15 @@ async def list_documents(
     Returns:
         List of document summaries
     """
-    results = []
-    for doc in docs:
-        if type_filter and doc.primitive_type != type_filter:
-            continue
-
-        results.append(
-            {
-                "name": doc.name,
-                "type": doc.primitive_type.value,
-                "file": str(doc.file_path),
-            }
-        )
+    index = ensure_index(index_or_docs)
+    results = [
+        {
+            "name": doc.name,
+            "type": doc.primitive_type.value,
+            "file": str(doc.file_path),
+        }
+        for doc in index.documents_of_type(type_filter)
+    ]
 
     # Sort by type then name
     results.sort(key=lambda x: (x["type"], x["name"]))

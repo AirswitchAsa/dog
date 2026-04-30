@@ -7,7 +7,7 @@
 
 ## Description
 
-The `@User` runs the `dog export` command. The `#CLI` exports all `&DogDocument` instances as a JSON array containing full document data.
+The `@User` runs the `dog export` command. The `#CLI` builds a `#DogIndex` and exports all `&DogDocument` instances as a JSON array containing full document data.
 
 Export includes for each document:
 - name and type

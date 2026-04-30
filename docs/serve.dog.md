@@ -7,10 +7,11 @@
 
 ## Description
 
-The `@User` runs the `dog serve` command with an optional path. The `#CLI` invokes `#Server` to start a local web server that renders all `&DogDocument` files as HTML pages.
+The `@User` runs the `dog serve` command with an optional path. The `#CLI` invokes `#Server` to start a local web server that builds an in-memory `#DogIndex` and renders all `&DogDocument` files as HTML pages.
 
 Key features:
 - Hot-reload support for automatic refresh on file changes
+- In-memory index rebuild on file changes
 - Color-coded reference links (red=Actor, blue=Behavior, purple=Component, green=Data)
 - MoMA-inspired minimalist design with Inter font
 - Automatic favicon discovery (favicon.png or dog.png)

@@ -1,3 +1,4 @@
+from dog_core.dog_index import AmbiguousLookupError, DogIndex, PrimitiveKey, ReferenceOccurrence, SearchEntry
 from dog_core.export import export_documents
 from dog_core.finder import find_dog_files
 from dog_core.formatter import format_content, format_file, format_file_in_place
@@ -17,7 +18,6 @@ from dog_core.models import (
     parse_primitive_query,
 )
 from dog_core.parser import ParseError, parse_document, parse_documents
-from dog_core.patcher import PatchData, PatchResult, patch_document
 from dog_core.refs import RefResult, RefsResult, find_refs
 from dog_core.search import SearchResult, search_documents
 from dog_core.server import DocServer, create_server, run_server
@@ -27,24 +27,27 @@ from dog_core.server import DocServer, create_server, run_server
 dog-core package.
 """
 
-__version__ = "2025.12.7.post2"
+__version__ = "2026.4.30"
 
 __all__ = [
     "ALLOWED_SECTIONS",
     "SIGIL_MAP",
+    "AmbiguousLookupError",
     "DocServer",
+    "DogIndex",
     "DogDocument",
     "GetResult",
     "InlineReference",
     "LintIssue",
     "LintResult",
     "ParseError",
-    "PatchData",
-    "PatchResult",
+    "PrimitiveKey",
     "PrimitiveType",
+    "ReferenceOccurrence",
     "RefResult",
     "RefsResult",
     "ResolvedReference",
+    "SearchEntry",
     "SearchResult",
     "Section",
     "create_server",
@@ -62,7 +65,6 @@ __all__ = [
     "parse_document",
     "parse_documents",
     "parse_primitive_query",
-    "patch_document",
     "run_server",
     "search_documents",
 ]

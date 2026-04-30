@@ -2,14 +2,16 @@
 
 ## Description
 
-Provides fuzzy search across DOG documents using RapidFuzz. Calculates relevance scores based on query matches in names, sections, and references. Returns top-k results sorted by score.
+Provides hybrid local search across DOG documents using the `#DogIndex`. Calculates relevance scores based on primitive identity, exact text matches, fuzzy name matches, weighted section matches, references, and optional graph expansion. Returns only results that satisfy the configured relevance threshold.
 
 ## State
 
-- docs: list of parsed `&DogDocument` instances
+- index: `#DogIndex` containing parsed documents and lookup maps
 - query: search string
 - type_filter: optional primitive type filter
 - limit: maximum results to return (top-k)
+- min_score: minimum relevance score required for inclusion
+- expand_refs: whether connected documents should be included from high-confidence hits
 
 ## Events
 
@@ -17,10 +19,9 @@ Provides fuzzy search across DOG documents using RapidFuzz. Calculates relevance
 
 ## Notes
 
-- Uses RapidFuzz for fuzzy string matching
-- Uses Levenshtein distance for name similarity
-- Supports token-based matching (word reordering)
-- Supports partial/substring matches
-- Name matches boosted 20% over content matches
+- Uses local deterministic scoring; no embedding or model dependency is required
+- Exact primitive/name matches outrank fuzzy and content matches
+- Section weights prioritize names and behavioral sections over notes
+- Reference matches use the `#DogIndex` graph
 - Returns scores on 0-100 scale
-- Results sorted: exact matches first, then by name distance, then by score
+- Results sorted by exactness, relevance score, and deterministic tie-breakers

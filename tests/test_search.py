@@ -146,10 +146,8 @@ class TestSearchDocuments:
 
     @pytest.mark.asyncio
     async def test_low_relevance_query(self, parsed_docs: list) -> None:
-        # With top-k, we always get results sorted by name distance then score
         results = await search_documents(parsed_docs, "xyznonexistent123456")
-        # Results exist
-        assert len(results) > 0
+        assert results == []
 
     @pytest.mark.asyncio
     async def test_results_sorted_by_relevance(self, parsed_docs: list) -> None:
