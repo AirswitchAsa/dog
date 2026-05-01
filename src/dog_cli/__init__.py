@@ -2,4 +2,4 @@
 dog-cli package.
 """
 
-__version__ = "2026.4.30"
+__version__ = "2026.5.1"

@@ -1,7 +1,7 @@
 [project]
 name = "dog-cli"
 authors = [{ name = "Qian Zhang", email = "contact@qzsh.email" }]
-version = "2026.4.30"
+version = "2026.5.1"
 description = "Documentation Oriented Grammar (DOG) CLI Tool"
 readme = "README.md"
 license = { file = "LICENSE" }
