@@ -37,6 +37,7 @@ app = typer.Typer(
     name="dog",
     help="DOG (Documentation Oriented Grammar) CLI tool",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 
@@ -104,18 +105,18 @@ def lint(
             if output == OutputFormat.json:
                 _json_echo({"issues": [], "error": str(e)})
             else:
-                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
             return 1
 
         if not index.documents:
             if output == OutputFormat.json:
                 _json_echo({"issues": [], "error": "No .dog.md files found"})
             else:
-                typer.echo(f"No .dog.md files found in {path}")
+                typer.echo(f"No .dog.md files found in {path}", err=True)
             return 1
 
         if output == OutputFormat.text:
-            typer.echo(f"Linting {len(index.documents)} file(s)...")
+            typer.echo(f"Linting {len(index.documents)} file(s)...", err=True)
 
         result = await lint_documents(index)
 
@@ -177,6 +178,14 @@ def format_cmd(
             help="Check if files are formatted without modifying them",
         ),
     ] = False,
+    output: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output format",
+        ),
+    ] = OutputFormat.text,
 ) -> None:
     """Format .dog.md files (normalize whitespace and indentation)."""
 
@@ -184,35 +193,52 @@ def format_cmd(
         files = await find_dog_files(path)
 
         if not files:
-            typer.echo(f"No .dog.md files found in {path}")
+            if output == OutputFormat.json:
+                _json_echo({"changed": [], "error": "No .dog.md files found"})
+            else:
+                typer.echo(f"No .dog.md files found in {path}", err=True)
             return 1
 
-        changed_count = 0
+        changed_files: list[str] = []
 
         for file_path in files:
             if check:
-                # Just check, don't modify
                 from dog_core import format_file
 
                 changed, _ = await format_file(file_path)
                 if changed:
-                    typer.echo(f"Would reformat: {file_path}")
-                    changed_count += 1
+                    changed_files.append(str(file_path))
+                    if output == OutputFormat.text:
+                        typer.echo(f"Would reformat: {file_path}")
             else:
                 changed = await format_file_in_place(file_path)
                 if changed:
-                    typer.echo(f"Formatted: {file_path}")
-                    changed_count += 1
+                    changed_files.append(str(file_path))
+                    if output == OutputFormat.text:
+                        typer.echo(f"Formatted: {file_path}")
+
+        if output == OutputFormat.json:
+            _json_echo(
+                {
+                    "check": check,
+                    "changed": changed_files,
+                    "count": len(changed_files),
+                    "scanned": len(files),
+                }
+            )
+            if check and changed_files:
+                return 1
+            return 0
 
         if check:
-            if changed_count > 0:
-                typer.echo(f"\n{changed_count} file(s) would be reformatted")
+            if changed_files:
+                typer.echo(f"\n{len(changed_files)} file(s) would be reformatted")
                 return 1
             typer.secho("All files already formatted!", fg=typer.colors.GREEN)
             return 0
 
-        if changed_count > 0:
-            typer.echo(f"\nFormatted {changed_count} file(s)")
+        if changed_files:
+            typer.echo(f"\nFormatted {len(changed_files)} file(s)")
         else:
             typer.echo("All files already formatted")
         return 0
@@ -247,13 +273,14 @@ def index(
                 typer.secho(
                     "Output file must be named 'index.dog.md'",
                     fg=typer.colors.RED,
+                    err=True,
                 )
                 return 1
             output_path = path
             search_path = path.parent
         else:
             if not path.exists():
-                typer.secho(f"Directory does not exist: {path}", fg=typer.colors.RED)
+                typer.secho(f"Directory does not exist: {path}", fg=typer.colors.RED, err=True)
                 return 1
             search_path = path
             output_path = path / "index.dog.md"
@@ -261,11 +288,11 @@ def index(
         try:
             dog_index = await _load_index(search_path)
         except ParseError as e:
-            typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+            typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
             return 1
 
         if not dog_index.documents:
-            typer.echo(f"No .dog.md files found in {search_path}")
+            typer.echo(f"No .dog.md files found in {search_path}", err=True)
 
         await generate_index(dog_index.documents, name, output_path)
         typer.secho(f"Generated index: {output_path}", fg=typer.colors.GREEN)
@@ -339,14 +366,14 @@ def search(  # noqa: C901
             if output == OutputFormat.json:
                 _json_echo({"results": [], "error": str(e)})
             else:
-                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
             return 1
 
         if not index.documents:
             if output == OutputFormat.json:
                 _json_echo({"results": [], "error": "No .dog.md files found"})
             else:
-                typer.echo(f"No .dog.md files found in {path}")
+                typer.echo(f"No .dog.md files found in {path}", err=True)
             return 1
 
         threshold = 0.0 if all_results else min_score
@@ -419,7 +446,7 @@ def get(  # noqa: C901
             if output == OutputFormat.json:
                 _json_echo({"error": "Name is required"})
             else:
-                typer.secho("Name is required", fg=typer.colors.RED)
+                typer.secho("Name is required", fg=typer.colors.RED, err=True)
             return 1
 
         try:
@@ -428,14 +455,14 @@ def get(  # noqa: C901
             if output == OutputFormat.json:
                 _json_echo({"error": str(e)})
             else:
-                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
             return 1
 
         if not index.documents:
             if output == OutputFormat.json:
                 _json_echo({"error": "No .dog.md files found"})
             else:
-                typer.echo(f"No .dog.md files found in {path}")
+                typer.echo(f"No .dog.md files found in {path}", err=True)
             return 1
 
         try:
@@ -444,14 +471,14 @@ def get(  # noqa: C901
             if output == OutputFormat.json:
                 _json_echo({"error": str(e)})
             else:
-                typer.secho(str(e), fg=typer.colors.RED)
+                typer.secho(str(e), fg=typer.colors.RED, err=True)
             return 1
 
         if result is None:
             if output == OutputFormat.json:
                 _json_echo({"error": f"Not found: {name}"})
             else:
-                typer.secho(f"Not found: {name}", fg=typer.colors.RED)
+                typer.secho(f"Not found: {name}", fg=typer.colors.RED, err=True)
             return 1
 
         if output == OutputFormat.json:
@@ -507,7 +534,7 @@ def list_cmd(  # noqa: C901
                 if output == OutputFormat.json:
                     _json_echo({"documents": [], "error": "Invalid filter. Use @, !, #, or &"})
                 else:
-                    typer.secho("Invalid filter. Use @, !, #, or &", fg=typer.colors.RED)
+                    typer.secho("Invalid filter. Use @, !, #, or &", fg=typer.colors.RED, err=True)
                 return 1
 
         try:
@@ -516,7 +543,7 @@ def list_cmd(  # noqa: C901
             if output == OutputFormat.json:
                 _json_echo({"documents": [], "error": str(e)})
             else:
-                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
             return 1
 
         if not index.documents:
@@ -594,14 +621,14 @@ def refs(
             if output == OutputFormat.json:
                 _json_echo({"error": str(e)})
             else:
-                typer.secho(f"Parse error: {e}", fg=typer.colors.RED)
+                typer.secho(f"Parse error: {e}", fg=typer.colors.RED, err=True)
             return 1
 
         if not index.documents:
             if output == OutputFormat.json:
                 _json_echo({"error": "No .dog.md files found"})
             else:
-                typer.echo(f"No .dog.md files found in {path}")
+                typer.echo(f"No .dog.md files found in {path}", err=True)
             return 1
 
         result = await find_refs(index, query)
@@ -742,7 +769,6 @@ def serve(
         str,
         typer.Option(
             "--host",
-            "-h",
             help="Host to bind to",
         ),
     ] = "127.0.0.1",
