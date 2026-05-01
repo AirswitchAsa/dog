@@ -1,11 +1,14 @@
 import asyncio
 import json
 from enum import Enum
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from dog_cli import __version__ as _fallback_version
 from dog_core import (
     AmbiguousLookupError,
     DogIndex,
@@ -35,6 +38,35 @@ app = typer.Typer(
     help="DOG (Documentation Oriented Grammar) CLI tool",
     no_args_is_help=True,
 )
+
+
+def _resolve_version() -> str:
+    try:
+        return _pkg_version("dog-cli")
+    except PackageNotFoundError:
+        return _fallback_version
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"dog {_resolve_version()}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _root(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-v",
+            help="Show the version and exit.",
+            callback=_version_callback,
+            is_eager=True,
+        ),
+    ] = False,
+) -> None:
+    """DOG (Documentation Oriented Grammar) CLI tool."""
 
 
 def _json_echo(payload: dict) -> None:
