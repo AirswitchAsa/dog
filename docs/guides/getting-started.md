@@ -1,18 +1,18 @@
 # Getting Started
 
-This guide walks you through creating your first DOG documentation.
+This guide walks you through creating your first DOG documentation. For installation options, see the [install guide](install.md).
 
-## Installation
+## Quick install
 
 ```bash
 pip install dog-cli
-# or with uv
-uv add dog-cli
+# or:
+uv tool install dog-cli
 ```
 
-## Your First Document
+## Your first document
 
-Create a file called `user.dog.md`:
+A `.dog.md` file holds exactly one primitive. Create `user.dog.md`:
 
 ```markdown
 # Actor: User
@@ -23,31 +23,33 @@ A human user of the system who interacts through the web interface.
 
 ## Notes
 
-- Primary actor for most behaviors
+- Primary actor for most behaviors.
 ```
 
-## Primitive Types
+## Primitive types
 
-DOG defines five primitive types:
+DOG defines five primitive types. Each has a fixed set of required sections.
 
-| Type | Purpose | Example |
-|------|---------|---------|
-| Project | Index of a doc set | `# Project: MyApp` |
-| Actor | Who does things | `# Actor: User` |
-| Behavior | What happens | `# Behavior: Login` |
-| Component | System parts | `# Component: AuthService` |
-| Data | Domain entities | `# Data: Credentials` |
+| Type      | Header           | Required sections                                                  | Sigil |
+| --------- | ---------------- | ------------------------------------------------------------------ | ----- |
+| Project   | `# Project: …`   | Description, Actors, Behaviors, Components, Data, Notes            |       |
+| Actor     | `# Actor: …`     | Description, Notes                                                 | `@`   |
+| Behavior  | `# Behavior: …`  | Condition, Description, Outcome, Notes                             | `!`   |
+| Component | `# Component: …` | Description, State, Events, Notes                                  | `#`   |
+| Data      | `# Data: …`      | Description, Fields, Notes                                         | `&`   |
 
-## Cross-References
+## Cross-references
 
 Link concepts using sigils inside backticks:
 
-- `@User` references an Actor
-- `!Login` references a Behavior
-- `#AuthService` references a Component
-- `&Credentials` references a Data
+- `` `@User` `` references an Actor
+- `` `!Login` `` references a Behavior
+- `` `#AuthService` `` references a Component
+- `` `&Credentials` `` references a Data primitive
 
-## Generate an Index
+References are typed: only use a sigil when the referenced primitive exists with that exact type. Mistyped or missing references are lint errors.
+
+## Generate an index
 
 Once you have several documents, generate a project index:
 
@@ -55,22 +57,27 @@ Once you have several documents, generate a project index:
 dog index docs/ --name "My Project"
 ```
 
-This creates `index.dog.md` listing all your primitives.
+This creates `index.dog.md` listing all your primitives by type.
 
-## Validate Your Docs
-
-Check for structural issues and broken references:
+## Validate
 
 ```bash
 dog lint docs/
 ```
 
-## Browse in Browser
+Use this as the quality gate before completing documentation changes.
 
-Start the documentation server:
+## Browse in a browser
 
 ```bash
 dog serve docs/
 ```
 
-Open http://localhost:8000 to see your docs with color-coded links.
+Open <http://localhost:8000> for a navigable view with color-coded references and hot-reload.
+
+## Next steps
+
+- [CLI reference](cli.md) — every command and flag
+- [Agent workflow](agent-workflow.md) — how coding agents use DOG
+- [Philosophy](philosophy.md) — design principles
+- [Comparisons](comparisons.md) — DOG vs Gherkin, OpenAPI, C4, ADRs, Spec Kit, Kiro
