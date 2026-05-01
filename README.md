@@ -97,6 +97,25 @@ See [comparisons](docs/guides/comparisons.md) for the full picture.
 
 ---
 
+## Does it actually work?
+
+A controlled eval against the [`crates/warp_cli`](https://github.com/warpdotdev/warp/tree/main/crates/warp_cli) subsystem of [warpdotdev/warp](https://github.com/warpdotdev/warp): same agent (`claude-sonnet-4-6`), 5 information-retrieval tasks, 3 trials per condition. Condition A gets warp source only; condition B adds an authored DOG docset and the dog skill.
+
+| | A (baseline) | B (with DOG) |
+|---|---|---|
+| Concept recall (mean) | 0.957 | **0.991** |
+| File recall (mean) | 0.733 | **0.967** |
+| Hallucination rate | 0/15 | 0/15 |
+| Tool calls per task (mean) | 19.7 | **12.7** |
+
+B matches or beats A on concept recall on every task, doubles file recall on the two tasks where A struggled to cite the right file, and uses ~35% fewer tool calls on average. Zero hallucinations in either condition.
+
+The DOG docs were authored in a **separate Claude Code session** with no shared context with the eval runner, and ground truth was sourced from the Rust code rather than from the docs — so B doesn't get credit for echoing its own docs back.
+
+Full methodology, per-task analysis, raw transcripts, and limitations: [AirswitchAsa/dog-eval-warp](https://github.com/AirswitchAsa/dog-eval-warp).
+
+---
+
 ## Docs
 
 - [Getting started](docs/guides/getting-started.md) — primitives, sigils, your first `.dog.md`
@@ -104,6 +123,7 @@ See [comparisons](docs/guides/comparisons.md) for the full picture.
 - [CLI reference](docs/guides/cli.md) — every command and flag
 - [Agent workflow](docs/guides/agent-workflow.md) — concept-diff workflow, skill install, system-prompt fallback
 - [Comparisons](docs/guides/comparisons.md) — DOG vs Gherkin, OpenAPI, C4, ADRs, Spec Kit, Kiro
+- [Evaluation](https://github.com/AirswitchAsa/dog-eval-warp) — controlled eval on a real Rust codebase
 - [Philosophy](docs/guides/philosophy.md) — design principles
 - [Example docset](docs/) — DOG dogfooding itself
 
